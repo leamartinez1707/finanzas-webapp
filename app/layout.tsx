@@ -21,6 +21,15 @@ export const metadata: Metadata = {
   description:
     'Llevá los gastos compartidos de tu hogar, los objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
   generator: 'v0.app',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Nido',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 }
 
 export const viewport: Viewport = {

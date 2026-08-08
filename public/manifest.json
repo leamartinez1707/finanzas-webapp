@@ -1,0 +1,16 @@
+{
+  "name": "Nido — Finanzas del hogar",
+  "short_name": "Nido",
+  "description": "Llevá los gastos compartidos de tu hogar, los objetivos de ahorro y tus finanzas personales.",
+  "start_url": "/inicio",
+  "display": "standalone",
+  "background_color": "#f2efe6",
+  "theme_color": "#f2efe6",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-light-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/icon-dark-32x32.png", "sizes": "32x32", "type": "image/png" }
+  ]
+}
