@@ -56,7 +56,7 @@ export default function InicioPage() {
   )[0]
 
   return (
-    <div className="space-y-6 px-4 pt-3">
+    <div className="space-y-4 px-1">
       <header className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">

@@ -26,7 +26,7 @@ export function GoalCard({
   return (
     <Link
       href={`/objetivos/${goal.id}`}
-      className="block rounded-3xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+      className="block rounded-2xl border border-border bg-card p-3.5 transition-colors hover:border-primary/40"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

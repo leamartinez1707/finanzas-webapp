@@ -89,7 +89,7 @@ export default function GastosPage() {
   if (loading || !currentUser) return null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ScreenHeader
         title={isPersonal ? 'Mis gastos' : 'Gastos'}
         subtitle={
@@ -173,7 +173,7 @@ export default function GastosPage() {
       </div>
 
       {/* --- summary --- */}
-      <div className="flex items-center justify-between rounded-2xl bg-card px-4 py-3 ring-1 ring-border/50">
+      <div className="flex items-center justify-between rounded-xl bg-card px-3 py-2.5 ring-1 ring-border/50">
         <span className="text-sm text-muted-foreground">
           {scopedExpenses.length} gasto{scopedExpenses.length !== 1 && 's'}
           {hasFilters && ' filtrados'}
@@ -187,7 +187,7 @@ export default function GastosPage() {
 
       {/* --- list --- */}
       {grouped.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {grouped.map(([key, items]) => (
             <section key={key}>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">

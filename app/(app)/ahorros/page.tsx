@@ -93,7 +93,7 @@ export default function AhorrosPage() {
   if (loading || !currentUser) return null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ScreenHeader
         title="Ahorros"
         subtitle={isPersonal ? 'Tu ahorro personal' : activeHousehold?.name}
@@ -119,7 +119,7 @@ export default function AhorrosPage() {
             const isExpanded = expandedMember === member.id || visibleMembers.length === 1
 
             return (
-              <div key={member.id} className="rounded-3xl border border-border bg-card overflow-hidden">
+              <div key={member.id} className="rounded-2xl border border-border bg-card overflow-hidden">
                 {/* --- member header --- */}
                 <button
                   onClick={() => setExpandedMember(isExpanded ? null : member.id)}
@@ -224,7 +224,7 @@ export default function AhorrosPage() {
         onClose={() => setAdding(false)}
         title="Registrar movimiento"
       >
-        <form onSubmit={handleAdd} className="space-y-5">
+        <form onSubmit={handleAdd} className="space-y-4">
           {/* type toggle */}
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
             <button

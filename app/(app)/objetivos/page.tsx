@@ -55,7 +55,7 @@ export default function ObjetivosPage() {
   if (loading || !currentUser) return null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ScreenHeader
         title={isPersonal ? 'Mis objetivos' : 'Objetivos'}
         subtitle={
@@ -78,7 +78,7 @@ export default function ObjetivosPage() {
 
       {/* --- overall progress --- */}
       {scopedGoals.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">Progreso total</span>
             <span className="text-sm font-bold tabular-nums">{overallPct}%</span>

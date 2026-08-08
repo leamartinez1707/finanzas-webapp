@@ -17,7 +17,7 @@ export function ScreenHeader({
 }) {
   const router = useRouter()
   return (
-    <div className="mb-5 flex items-start gap-3">
+    <div className="mb-3 flex items-start gap-3">
       {back && (
         <button
           onClick={() => router.back()}
@@ -46,7 +46,7 @@ export function SectionTitle({
   className?: string
 }) {
   return (
-    <div className={cn('mb-3 flex items-center justify-between', className)}>
+    <div className={cn('mb-2 flex items-center justify-between', className)}>
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {children}
       </h2>

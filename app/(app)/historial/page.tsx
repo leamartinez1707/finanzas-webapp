@@ -81,7 +81,7 @@ export default function HistorialPage() {
   if (loading || !currentUser) return null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ScreenHeader title="Historial" subtitle="Todos los movimientos" />
 
       {/* --- kind filters --- */}

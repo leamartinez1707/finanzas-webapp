@@ -20,7 +20,7 @@ export function ActivityRow({
   const member = getMember(item.memberId)
 
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-card p-3">
+    <li className="flex items-center gap-2.5 rounded-xl bg-card p-2.5">
       {item.kind === 'gasto' && item.category ? (
         <CategoryIcon category={item.category} size="md" />
       ) : (

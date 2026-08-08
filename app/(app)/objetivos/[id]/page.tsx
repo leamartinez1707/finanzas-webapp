@@ -25,7 +25,7 @@ export default function GoalDetailPage() {
 
   if (!goal) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <ScreenHeader title="Objetivo no encontrado" back />
         <p className="text-sm text-muted-foreground">Este objetivo ya no existe o fue eliminado.</p>
       </div>
@@ -51,11 +51,11 @@ export default function GoalDetailPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ScreenHeader title={goal.name} back />
 
       {/* --- big progress --- */}
-      <div className="rounded-3xl border border-border bg-card p-6 text-center">
+      <div className="rounded-2xl border border-border bg-card p-6 text-center">
         <div className="mx-auto mb-4 size-24">
           <svg viewBox="0 0 96 96" className="size-full -rotate-90">
             <circle
@@ -160,7 +160,7 @@ export default function GoalDetailPage() {
         onClose={() => setContributing(false)}
         title={`Aportar a ${goal.name}`}
       >
-        <form onSubmit={handleContribute} className="space-y-5">
+        <form onSubmit={handleContribute} className="space-y-4">
           <Field label="Monto del aporte" htmlFor="contrib-amount">
             <input
               id="contrib-amount"

@@ -25,7 +25,7 @@ export function ExpenseRow({
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-2xl border border-transparent bg-card p-3 text-left transition-colors',
+        'flex w-full items-center gap-2.5 rounded-xl border border-transparent bg-card p-2.5 text-left transition-colors',
         onClick && 'hover:border-border',
       )}
     >

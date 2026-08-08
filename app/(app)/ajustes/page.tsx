@@ -87,7 +87,7 @@ export default function AjustesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <ScreenHeader title="Ajustes" subtitle={activeHousehold.name} />
 
       {/* --- household info --- */}
