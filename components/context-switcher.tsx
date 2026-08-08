@@ -54,7 +54,7 @@ export function ContextSwitcher() {
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
       </button>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Cambiar de contexto">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Cambiar de contexto" className="sm:max-w-sm">
         <div className="space-y-2">
           {myHouseholds.map((h) => {
             const hm = h.memberIds.map((id) => members.find((m) => m.id === id)!).filter(Boolean)
