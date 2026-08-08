@@ -33,6 +33,7 @@ export function Sheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
+        type="button"
         aria-label="Cerrar"
         onClick={onClose}
         className="absolute inset-0 bg-foreground/40 backdrop-blur-sm animate-in fade-in"
@@ -41,12 +42,13 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 pb-8 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 sm:rounded-3xl sm:pb-5',
+          'relative z-10 flex w-full max-w-md flex-col rounded-t-3xl bg-card p-5 pb-8 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 sm:max-h-[90vh] sm:rounded-3xl sm:pb-5',
+          'max-h-[85vh]',
           className,
         )}
       >
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border sm:hidden" />
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mx-auto mb-4 h-1.5 w-10 shrink-0 rounded-full bg-border sm:hidden" />
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           {title && <h2 className="text-lg font-semibold">{title}</h2>}
           <button
             onClick={onClose}
@@ -56,7 +58,7 @@ export function Sheet({
             <X className="size-4" />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto">{children}</div>
       </div>
     </div>
   )
