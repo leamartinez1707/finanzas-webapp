@@ -31,6 +31,7 @@ export default function AjustesPage() {
     myHouseholds,
     members,
     currentUser,
+    loading,
     setSelectedContext,
     updateHousehold,
     createHousehold,
@@ -40,6 +41,8 @@ export default function AjustesPage() {
   const [editName, setEditName] = useState('')
   const [editCurrency, setEditCurrency] = useState<CurrencyCode>('UYU')
   const [showLeave, setShowLeave] = useState(false)
+
+  if (loading) return null
 
   if (isPersonal || !activeHousehold) {
     return (

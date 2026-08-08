@@ -19,11 +19,14 @@ export default function InicioPage() {
     activeHousehold,
     activeCurrency,
     currentUser,
+    loading,
     members,
     expenses,
     goals,
     savings,
   } = useApp()
+
+  if (loading || !currentUser) return null
 
   const scopeFilter = isPersonal
     ? ({ scope: 'personal', ownerId: currentUser!.id } as const)

@@ -25,6 +25,7 @@ export default function HistorialPage() {
     activeHousehold,
     activeCurrency,
     currentUser,
+    loading,
     members,
     expenses,
     goals,
@@ -34,6 +35,8 @@ export default function HistorialPage() {
   const [kindFilter, setKindFilter] = useState<ActivityKind | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | null>(null)
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
+
+  if (loading || !currentUser) return null
 
   const scopeFilter = useMemo(() => {
     if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser!.id }

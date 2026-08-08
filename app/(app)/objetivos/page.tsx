@@ -17,12 +17,15 @@ export default function ObjetivosPage() {
     activeHousehold,
     activeCurrency,
     currentUser,
+    loading,
     goals,
     addGoal,
   } = useApp()
 
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState<'activos' | 'cumplidos' | 'todos'>('activos')
+
+  if (loading || !currentUser) return null
 
   const scopedGoals = useMemo(() => {
     let list = isPersonal

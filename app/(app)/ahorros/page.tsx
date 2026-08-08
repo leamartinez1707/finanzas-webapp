@@ -19,6 +19,7 @@ export default function AhorrosPage() {
     activeHousehold,
     activeCurrency,
     currentUser,
+    loading,
     members,
     savings,
     addSavings,
@@ -30,6 +31,8 @@ export default function AhorrosPage() {
   const [movNote, setMovNote] = useState('')
   const [movError, setMovError] = useState('')
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
+
+  if (loading || !currentUser) return null
 
   // Members to show: in household mode, all household members; in personal mode, just current user
   const visibleMembers = useMemo(() => {

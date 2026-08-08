@@ -23,6 +23,7 @@ export default function GastosPage() {
     currentUser,
     members,
     expenses,
+    loading,
     addExpense,
     updateExpense,
   } = useApp()
@@ -84,6 +85,8 @@ export default function GastosPage() {
   }
 
   const hasFilters = openCategory !== null || openPayer !== null
+
+  if (loading || !currentUser) return null
 
   return (
     <div className="space-y-5">
