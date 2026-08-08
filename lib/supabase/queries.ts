@@ -385,14 +385,41 @@ export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
 
 // ─── Invites ────────────────────────────────────────────────────────
 
-export async function addInvite(householdId: string, email: string) {
+export async function addInvite(householdId: string, email: string): Promise<{ token: string; householdName: string; inviterName: string }> {
   const s = supabase()
   const { data: { user } } = await s.auth.getUser()
-  await s.from('household_invites').insert({
+  if (!user) throw new Error('Not authenticated')
+
+  // Get inviter name
+  const { data: profile } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  const inviterName = profile?.nombre ?? 'Alguien'
+
+  // Get household name
+  const { data: hh } = await s.from('households').select('nombre').eq('id', householdId).single()
+  const householdName = hh?.nombre ?? 'un hogar'
+
+  // Insert invite
+  const { data: invite } = await s.from('household_invites').insert({
     household_id: householdId,
     email_invitado: email,
-    invitado_por: user?.id ?? null,
-  })
+    invitado_por: user.id,
+  }).select('token').single()
+
+  const token = invite?.token ?? ''
+
+  // Send email via Resend
+  try {
+    await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, householdName, token, inviterName }),
+    })
+  } catch {
+    // Email failure shouldn't block the invite creation
+    console.warn('Failed to send invite email')
+  }
+
+  return { token, householdName, inviterName }
 }
 
 export async function updateInvite(householdId: string, inviteId: string, status: string) {
