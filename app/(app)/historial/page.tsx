@@ -36,8 +36,6 @@ export default function HistorialPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | null>(null)
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
 
-  if (loading || !currentUser) return null
-
   const scopeFilter = useMemo(() => {
     if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser!.id }
     return { scope: 'household' as const, householdId: activeHousehold!.id }
@@ -79,6 +77,8 @@ export default function HistorialPage() {
     setCategoryFilter(null)
     setMemberFilter(null)
   }
+
+  if (loading || !currentUser) return null
 
   return (
     <div className="space-y-5">

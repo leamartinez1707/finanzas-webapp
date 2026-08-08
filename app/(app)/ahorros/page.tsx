@@ -32,8 +32,6 @@ export default function AhorrosPage() {
   const [movError, setMovError] = useState('')
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
 
-  if (loading || !currentUser) return null
-
   // Members to show: in household mode, all household members; in personal mode, just current user
   const visibleMembers = useMemo(() => {
     if (isPersonal) return currentUser ? [currentUser] : []
@@ -91,6 +89,8 @@ export default function AhorrosPage() {
   }
 
   const hasAnySavings = [...savingsByMember.values()].some((m) => m.length > 0)
+
+  if (loading || !currentUser) return null
 
   return (
     <div className="space-y-5">

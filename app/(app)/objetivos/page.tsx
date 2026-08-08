@@ -25,8 +25,6 @@ export default function ObjetivosPage() {
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState<'activos' | 'cumplidos' | 'todos'>('activos')
 
-  if (loading || !currentUser) return null
-
   const scopedGoals = useMemo(() => {
     let list = isPersonal
       ? goals.filter((g) => g.scope === 'personal' && g.ownerId === currentUser?.id)
@@ -53,6 +51,8 @@ export default function ObjetivosPage() {
   const totalTarget = scopedGoals.reduce((s, g) => s + g.target, 0)
   const totalSaved = scopedGoals.reduce((s, g) => s + goalSaved(g), 0)
   const overallPct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0
+
+  if (loading || !currentUser) return null
 
   return (
     <div className="space-y-5">

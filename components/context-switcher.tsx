@@ -55,7 +55,7 @@ export function ContextSwitcher() {
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Cambiar de contexto">
-        <div className="space-y-2">
+        <div className="space-y-2 pt-10">
           {myHouseholds.map((h) => {
             const hm = h.memberIds.map((id) => members.find((m) => m.id === id)!).filter(Boolean)
             const selected = h.id === selectedContext
