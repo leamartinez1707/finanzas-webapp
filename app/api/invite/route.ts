@@ -13,8 +13,10 @@ export async function POST(request: Request) {
 
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invitacion/${token}`
 
+    const from = process.env.RESEND_FROM || 'Nido <onboarding@resend.dev>'
+
     const { data, error } = await resend.emails.send({
-      from: 'Nido <invitaciones@nido-app.com>',
+      from,
       to: [email],
       subject: `${inviterName || 'Alguien'} te invitó a ${householdName} en Nido`,
       html: `

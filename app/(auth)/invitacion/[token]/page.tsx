@@ -1,11 +1,12 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { House, Check, X, TriangleAlert } from 'lucide-react'
+import { House, Check, X, TriangleAlert, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { PersonAvatar, AvatarStack } from '@/components/person-avatar'
 import { useApp } from '@/lib/store'
+import { createClient } from '@/lib/supabase/client'
 
 export default function InvitacionPage({
   params,
@@ -14,15 +15,97 @@ export default function InvitacionPage({
 }) {
   const { token } = use(params)
   const router = useRouter()
-  const { getHousehold, members, setSelectedContext } = useApp()
-  const [rejected, setRejected] = useState(false)
+  const supabase = createClient()
 
-  const expired = token === 'expirada'
-  // Prototipo: la invitación apunta al hogar Casa Pocitos
-  const household = getHousehold('h-casa')
-  const inviter = members.find((m) => m.id === 'm-mateo')
-  const householdMembers =
-    household?.memberIds.map((id) => members.find((m) => m.id === id)!).filter(Boolean) ?? []
+  const [loading, setLoading] = useState(true)
+  const [expired, setExpired] = useState(false)
+  const [rejected, setRejected] = useState(false)
+  const [invite, setInvite] = useState<any>(null)
+  const [household, setHousehold] = useState<any>(null)
+  const [inviter, setInviter] = useState<any>(null)
+  const [householdMembers, setHouseholdMembers] = useState<any[]>([])
+
+  useEffect(() => {
+    async function load() {
+      // Look up the invite by token
+      const { data: inv } = await supabase
+        .from('household_invites')
+        .select('*, household:households(*)')
+        .eq('token', token)
+        .single()
+
+      if (!inv) {
+        setExpired(true)
+        setLoading(false)
+        return
+      }
+
+      if (inv.estado === 'expirada' || new Date(inv.expira_en) < new Date()) {
+        setExpired(true)
+        setLoading(false)
+        return
+      }
+
+      setInvite(inv)
+      setHousehold(inv.household)
+
+      // Get inviter profile
+      if (inv.invitado_por) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', inv.invitado_por)
+          .single()
+        setInviter(prof)
+      }
+
+      // Get members of the household
+      const { data: memberships } = await supabase
+        .from('household_members')
+        .select('user_id')
+        .eq('household_id', inv.household_id)
+
+      if (memberships) {
+        const ids = memberships.map((m) => m.user_id)
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', ids)
+        setHouseholdMembers(profiles ?? [])
+      }
+
+      setLoading(false)
+    }
+    load()
+  }, [token, supabase])
+
+  async function handleAccept() {
+    if (!invite) return
+    // Accept the invite
+    await supabase
+      .from('household_invites')
+      .update({ estado: 'aceptada' })
+      .eq('id', invite.id)
+
+    // Add user as member
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from('household_members').insert({
+        household_id: invite.household_id,
+        user_id: user.id,
+      })
+    }
+
+    router.push('/inicio')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   if (expired) {
     return (
@@ -71,30 +154,27 @@ export default function InvitacionPage({
         <p className="mt-5 text-muted-foreground">
           {inviter && (
             <span className="inline-flex items-center gap-1.5 align-middle">
-              <PersonAvatar member={inviter} size="xs" />
-              <span className="font-medium text-foreground">{inviter.name}</span>
+              <PersonAvatar member={{ name: inviter.nombre, color: inviter.color }} size="xs" />
+              <span className="font-medium text-foreground">{inviter.nombre}</span>
             </span>
           )}{' '}
           te invitó a
         </p>
         <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight">
-          {household?.name}
+          {household?.nombre}
         </h1>
 
         <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-border bg-card px-6 py-5">
-          <AvatarStack members={householdMembers} size="md" />
+          <AvatarStack members={householdMembers.map((p: any) => ({ name: p.nombre, color: p.color }))} size="md" />
           <p className="text-sm text-muted-foreground">
-            {householdMembers.length} personas ya comparten los gastos acá.
+            {householdMembers.length} persona{householdMembers.length !== 1 && 's'} ya comparten los gastos acá.
           </p>
         </div>
       </div>
 
       <div className="flex flex-col gap-2 pb-2">
         <button
-          onClick={() => {
-            setSelectedContext('h-casa')
-            router.push('/inicio')
-          }}
+          onClick={handleAccept}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
         >
           <Check className="size-5" />
