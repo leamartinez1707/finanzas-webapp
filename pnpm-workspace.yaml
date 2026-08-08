@@ -1,2 +1,6 @@
 allowBuilds:
   msw: true
+minimumReleaseAgeExclude:
+  - '@types/pg@8.21.0'
+  - lucide-react@1.30.0
+  - npm-check-updates@23.0.2
