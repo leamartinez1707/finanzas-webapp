@@ -7,18 +7,20 @@ import { CurrencySelect } from '@/components/currency-select'
 import type { CurrencyCode, Goal } from '@/lib/types'
 
 export function GoalForm({
+  initial,
   onSubmit,
   onCancel,
 }: {
+  initial?: Goal
   onSubmit: (data: Omit<Goal, 'id' | 'contributions'>) => void
   onCancel?: () => void
 }) {
   const { isPersonal, activeHousehold, currentUser, activeCurrency } = useApp()
 
-  const [name, setName] = useState('')
-  const [target, setTarget] = useState('')
-  const [currency, setCurrency] = useState<CurrencyCode>(activeCurrency)
-  const [deadline, setDeadline] = useState('')
+  const [name, setName] = useState(initial?.name ?? '')
+  const [target, setTarget] = useState(initial ? String(initial.target) : '')
+  const [currency, setCurrency] = useState<CurrencyCode>(initial?.currency ?? activeCurrency)
+  const [deadline, setDeadline] = useState(initial?.deadline ?? '')
   const [error, setError] = useState('')
 
   function handleSubmit(e: React.FormEvent) {
@@ -31,7 +33,7 @@ export function GoalForm({
     onSubmit({
       scope: isPersonal ? 'personal' : 'household',
       householdId: isPersonal ? undefined : activeHousehold?.id,
-      ownerId: isPersonal ? currentUser?.id : undefined,
+      ownerId: currentUser?.id,
       name: name.trim(),
       target: value,
       currency,
@@ -99,7 +101,7 @@ export function GoalForm({
           type="submit"
           className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
         >
-          Crear objetivo
+          {initial ? 'Guardar cambios' : 'Crear objetivo'}
         </button>
       </div>
     </form>

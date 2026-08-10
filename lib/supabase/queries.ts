@@ -339,6 +339,23 @@ export async function addGoal(g: Omit<Goal, 'id' | 'contributions'>): Promise<Go
   return toGoal(data, [])
 }
 
+export async function updateGoal(id: string, patch: Partial<Goal>) {
+  const s = supabase()
+  const update: Record<string, any> = {}
+  if (patch.name !== undefined) update.nombre = patch.name
+  if (patch.target !== undefined) update.monto_objetivo = patch.target
+  if (patch.currency !== undefined) update.moneda = patch.currency
+  if (patch.deadline !== undefined) update.fecha_limite = patch.deadline ?? null
+
+  await s.from('goals').update(update).eq('id', id)
+}
+
+export async function deleteGoal(id: string) {
+  const s = supabase()
+  await s.from('goal_contributions').delete().eq('goal_id', id)
+  await s.from('goals').delete().eq('id', id)
+}
+
 export async function addContribution(goalId: string, userId: string, amount: number) {
   const s = supabase()
   await s.from('goal_contributions').insert({
@@ -346,6 +363,11 @@ export async function addContribution(goalId: string, userId: string, amount: nu
     user_id: userId,
     monto: amount,
   })
+}
+
+export async function deleteContribution(id: string) {
+  const s = supabase()
+  await s.from('goal_contributions').delete().eq('id', id)
 }
 
 // ─── Savings ────────────────────────────────────────────────────────
@@ -381,6 +403,22 @@ export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
     fecha: m.date,
     nota: m.note ?? null,
   })
+}
+
+export async function updateSavingsMovement(id: string, patch: Partial<SavingsMovement>) {
+  const s = supabase()
+  const update: Record<string, any> = {}
+  if (patch.type !== undefined) update.tipo = patch.type
+  if (patch.amount !== undefined) update.monto = patch.amount
+  if (patch.date !== undefined) update.fecha = patch.date
+  if (patch.note !== undefined) update.nota = patch.note
+
+  await s.from('savings_movements').update(update).eq('id', id)
+}
+
+export async function deleteSavingsMovement(id: string) {
+  const s = supabase()
+  await s.from('savings_movements').delete().eq('id', id)
 }
 
 // ─── Invites ────────────────────────────────────────────────────────

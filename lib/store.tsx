@@ -21,8 +21,13 @@ import {
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
   addGoal as addGoalDB,
+  updateGoal as updateGoalDB,
+  deleteGoal as deleteGoalDB,
   addContribution as addContributionDB,
+  deleteContribution as deleteContributionDB,
   addSavingsMovement as addSavingsMovementDB,
+  updateSavingsMovement as updateSavingsMovementDB,
+  deleteSavingsMovement as deleteSavingsMovementDB,
   createHousehold as createHouseholdDB,
   updateHousehold as updateHouseholdDB,
   addInvite as addInviteDB,
@@ -56,8 +61,13 @@ interface AppState {
   updateExpense: (id: string, e: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   addContribution: (goalId: string, memberId: string, amount: number) => Promise<void>
+  deleteContribution: (id: string) => Promise<void>
   addGoal: (g: Omit<Goal, 'id' | 'contributions'>) => Promise<void>
+  updateGoal: (id: string, patch: Partial<Goal>) => Promise<void>
+  deleteGoal: (id: string) => Promise<void>
   addSavings: (m: Omit<SavingsMovement, 'id'>) => Promise<void>
+  updateSavings: (id: string, patch: Partial<SavingsMovement>) => Promise<void>
+  deleteSavings: (id: string) => Promise<void>
   createHousehold: (name: string, currency: CurrencyCode) => Promise<string>
   addInvite: (householdId: string, email: string) => Promise<void>
   updateInvite: (householdId: string, inviteId: string, status: string) => Promise<void>
@@ -206,9 +216,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ),
         )
       },
+      deleteContribution: async (id) => {
+        await deleteContributionDB(id)
+        setGoals((prev) =>
+          prev.map((g) => ({
+            ...g,
+            contributions: g.contributions.filter((c) => c.id !== id),
+          })),
+        )
+      },
       addGoal: async (g) => {
         const created = await addGoalDB(g)
         setGoals((prev) => [created, ...prev])
+      },
+      updateGoal: async (id, patch) => {
+        await updateGoalDB(id, patch)
+        setGoals((prev) =>
+          prev.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+        )
+      },
+      deleteGoal: async (id) => {
+        await deleteGoalDB(id)
+        setGoals((prev) => prev.filter((g) => g.id !== id))
       },
       addSavings: async (m) => {
         await addSavingsMovementDB(m)
@@ -216,6 +245,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { ...m, id: crypto.randomUUID() },
           ...prev,
         ])
+      },
+      updateSavings: async (id, patch) => {
+        await updateSavingsMovementDB(id, patch)
+        setSavings((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        )
+      },
+      deleteSavings: async (id) => {
+        await deleteSavingsMovementDB(id)
+        setSavings((prev) => prev.filter((s) => s.id !== id))
       },
       createHousehold: async (name, currency) => {
         const id = await createHouseholdDB(name, currency)

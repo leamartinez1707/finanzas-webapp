@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Plus, CalendarDays, House, User } from 'lucide-react'
+import { Plus, CalendarDays, House, User, Pencil, Trash2, X } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -10,18 +10,21 @@ import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
 import { goalSaved } from '@/components/goal-card'
+import { GoalForm } from '../goal-form'
 import { formatDate } from '@/lib/format'
 
 export default function GoalDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { goals, members, getMember, activeCurrency, addContribution, currentUser } = useApp()
+  const { goals, members, getMember, activeCurrency, addContribution, deleteContribution, updateGoal, deleteGoal, currentUser } = useApp()
 
   const goal = useMemo(() => goals.find((g) => g.id === params.id), [goals, params.id])
 
   const [contributing, setContributing] = useState(false)
   const [contribAmount, setContribAmount] = useState('')
   const [contribError, setContribError] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (!goal) {
     return (
@@ -50,9 +53,44 @@ export default function GoalDetailPage() {
     setContribError('')
   }
 
+  function handleUpdate(data: Omit<Goal, 'id' | 'contributions'>) {
+    updateGoal(goal!.id, data)
+    setEditing(false)
+  }
+
+  function handleDelete() {
+    deleteGoal(goal!.id)
+    router.push('/objetivos')
+  }
+
+  function handleDeleteContribution(id: string) {
+    deleteContribution(id)
+  }
+
   return (
     <div className="space-y-4">
-      <ScreenHeader title={goal.name} back />
+      <ScreenHeader
+        title={goal.name}
+        back
+        action={
+          <div className="flex gap-1">
+            <button
+              onClick={() => setEditing(true)}
+              className="inline-flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Editar objetivo"
+            >
+              <Pencil className="size-4" />
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex size-9 items-center justify-center rounded-full border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10"
+              aria-label="Eliminar objetivo"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+        }
+      />
 
       {/* --- big progress --- */}
       <div className="rounded-2xl border border-border bg-card p-6 text-center">
@@ -145,6 +183,15 @@ export default function GoalDetailPage() {
                     <p className="text-xs text-muted-foreground">{formatDate(c.date)}</p>
                   </div>
                   <Money amount={c.amount} currency={goal.currency} className="text-base font-semibold text-positive" sign />
+                  {c.memberId === currentUser?.id && (
+                    <button
+                      onClick={() => handleDeleteContribution(c.id)}
+                      className="ml-1 shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Eliminar aporte"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
                 </li>
               )
             })}
@@ -196,6 +243,46 @@ export default function GoalDetailPage() {
             </button>
           </div>
         </form>
+      </Sheet>
+
+      {/* --- edit sheet --- */}
+      <Sheet
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Editar objetivo"
+      >
+        <GoalForm
+          initial={goal}
+          onSubmit={handleUpdate}
+          onCancel={() => setEditing(false)}
+        />
+      </Sheet>
+
+      {/* --- delete confirmation --- */}
+      <Sheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title="Eliminar objetivo"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            ¿Estás seguro de que querés eliminar <strong>{goal.name}</strong>? Esta acción no se puede deshacer.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex-1 rounded-2xl bg-destructive py-3.5 font-semibold text-destructive-foreground transition-transform active:translate-y-px"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
       </Sheet>
     </div>
   )

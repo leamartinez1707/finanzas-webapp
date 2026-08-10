@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { Field, inputClass } from '@/components/field'
@@ -14,10 +15,12 @@ export function ExpenseForm({
   initial,
   onSubmit,
   onCancel,
+  onDelete,
 }: {
   initial?: Expense
   onSubmit: (data: Omit<Expense, 'id'>) => void
   onCancel?: () => void
+  onDelete?: () => void
 }) {
   const { isPersonal, activeHousehold, activeCurrency, currentUser, members } = useApp()
 
@@ -158,6 +161,17 @@ export function ExpenseForm({
           {initial ? 'Guardar cambios' : 'Agregar gasto'}
         </button>
       </div>
+
+      {initial && onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <Trash2 className="size-4" />
+          Eliminar gasto
+        </button>
+      )}
     </form>
   )
 }

@@ -26,6 +26,7 @@ export default function GastosPage() {
     loading,
     addExpense,
     updateExpense,
+    deleteExpense,
   } = useApp()
 
   // --- filters ---
@@ -76,6 +77,12 @@ export default function GastosPage() {
   function handleUpdate(data: Omit<Expense, 'id'>) {
     if (!editing) return
     updateExpense(editing.id, data)
+    setEditing(undefined)
+  }
+
+  function handleDelete() {
+    if (!editing) return
+    deleteExpense(editing.id)
     setEditing(undefined)
   }
 
@@ -253,6 +260,7 @@ export default function GastosPage() {
             initial={editing}
             onSubmit={handleUpdate}
             onCancel={() => setEditing(undefined)}
+            onDelete={handleDelete}
           />
         )}
       </Sheet>

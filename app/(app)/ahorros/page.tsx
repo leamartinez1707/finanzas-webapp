@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, PiggyBank, ArrowDown, ArrowUp, Minus } from 'lucide-react'
+import { Plus, PiggyBank, ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -23,9 +23,12 @@ export default function AhorrosPage() {
     members,
     savings,
     addSavings,
+    updateSavings,
+    deleteSavings,
   } = useApp()
 
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<SavingsMovement | undefined>(undefined)
   const [movType, setMovType] = useState<'deposito' | 'retiro'>('deposito')
   const [movAmount, setMovAmount] = useState('')
   const [movNote, setMovNote] = useState('')
@@ -88,6 +91,37 @@ export default function AhorrosPage() {
     setMovError('')
   }
 
+  function openEdit(mov: SavingsMovement) {
+    setEditing(mov)
+    setMovType(mov.type)
+    setMovAmount(String(mov.amount))
+    setMovNote(mov.note ?? '')
+    setMovError('')
+  }
+
+  function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editing) return
+    const value = Number(movAmount)
+    if (!value || value <= 0) return setMovError('Ingresá un monto válido')
+    updateSavings(editing.id, {
+      type: movType,
+      amount: value,
+      date: editing.date,
+      note: movNote.trim() || undefined,
+    })
+    setEditing(undefined)
+    setMovAmount('')
+    setMovNote('')
+    setMovError('')
+  }
+
+  function handleDelete() {
+    if (!editing) return
+    deleteSavings(editing.id)
+    setEditing(undefined)
+  }
+
   const hasAnySavings = [...savingsByMember.values()].some((m) => m.length > 0)
 
   if (loading || !currentUser) return null
@@ -99,7 +133,7 @@ export default function AhorrosPage() {
         subtitle={isPersonal ? 'Tu ahorro personal' : activeHousehold?.name}
         action={
           <button
-            onClick={() => setAdding(true)}
+              onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovNote(''); setMovError('') }}
             className="inline-flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:translate-y-px"
             aria-label="Registrar movimiento"
           >
@@ -153,42 +187,44 @@ export default function AhorrosPage() {
                 {isExpanded && movs.length > 0 && (
                   <ul className="border-t border-border px-4 pb-4 pt-2 space-y-1.5">
                     {movs.slice(0, 10).map((mov) => (
-                      <li
-                        key={mov.id}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm"
-                      >
-                        <span
-                          className={cn(
-                            'inline-flex size-7 items-center justify-center rounded-full',
-                            mov.type === 'deposito'
-                              ? 'bg-positive/15 text-positive'
-                              : 'bg-destructive/15 text-destructive',
-                          )}
+                      <li key={mov.id}>
+                        <button
+                          onClick={() => openEdit(mov)}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-left transition-colors hover:bg-muted/50"
                         >
-                          {mov.type === 'deposito' ? (
-                            <ArrowDown className="size-3.5" />
-                          ) : (
-                            <ArrowUp className="size-3.5" />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium">
-                            {mov.type === 'deposito' ? 'Depósito' : 'Retiro'}
-                            {mov.note && ` · ${mov.note}`}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {formatRelative(mov.date)}
-                          </p>
-                        </div>
-                        <Money
-                          amount={mov.amount}
-                          currency={activeCurrency}
-                          className={cn(
-                            'text-sm font-semibold tnum',
-                            mov.type === 'deposito' ? 'text-positive' : 'text-destructive',
-                          )}
-                          sign={false}
-                        />
+                          <span
+                            className={cn(
+                              'inline-flex size-7 items-center justify-center rounded-full shrink-0',
+                              mov.type === 'deposito'
+                                ? 'bg-positive/15 text-positive'
+                                : 'bg-destructive/15 text-destructive',
+                            )}
+                          >
+                            {mov.type === 'deposito' ? (
+                              <ArrowDown className="size-3.5" />
+                            ) : (
+                              <ArrowUp className="size-3.5" />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium">
+                              {mov.type === 'deposito' ? 'Depósito' : 'Retiro'}
+                              {mov.note && ` · ${mov.note}`}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatRelative(mov.date)}
+                            </p>
+                          </div>
+                          <Money
+                            amount={mov.amount}
+                            currency={activeCurrency}
+                            className={cn(
+                              'text-sm font-semibold tnum',
+                              mov.type === 'deposito' ? 'text-positive' : 'text-destructive',
+                            )}
+                            sign={false}
+                          />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -208,7 +244,7 @@ export default function AhorrosPage() {
           }
           action={
             <button
-              onClick={() => setAdding(true)}
+            onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovNote(''); setMovError('') }}
               className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
               <Plus className="size-4" />
@@ -300,6 +336,99 @@ export default function AhorrosPage() {
               Registrar {movType === 'deposito' ? 'depósito' : 'retiro'}
             </button>
           </div>
+        </form>
+      </Sheet>
+
+      {/* --- edit movement sheet --- */}
+      <Sheet
+        open={!!editing}
+        onClose={() => setEditing(undefined)}
+        title={editing?.type === 'deposito' ? 'Editar depósito' : 'Editar retiro'}
+      >
+        <form onSubmit={handleUpdate} className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setMovType('deposito')}
+              className={cn(
+                'flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium transition-colors',
+                movType === 'deposito'
+                  ? 'bg-positive text-white shadow-sm'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <ArrowDown className="size-4" />
+              Depósito
+            </button>
+            <button
+              type="button"
+              onClick={() => setMovType('retiro')}
+              className={cn(
+                'flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium transition-colors',
+                movType === 'retiro'
+                  ? 'bg-destructive text-white shadow-sm'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <ArrowUp className="size-4" />
+              Retiro
+            </button>
+          </div>
+
+          <Field label="Monto" htmlFor="edit-savings-amount">
+            <input
+              id="edit-savings-amount"
+              inputMode="decimal"
+              value={movAmount}
+              onChange={(e) => {
+                setMovAmount(e.target.value.replace(/[^0-9.]/g, ''))
+                setMovError('')
+              }}
+              placeholder="0"
+              className={inputClass}
+              autoFocus
+            />
+          </Field>
+
+          <Field label="Nota (opcional)" htmlFor="edit-savings-note">
+            <input
+              id="edit-savings-note"
+              value={movNote}
+              onChange={(e) => setMovNote(e.target.value)}
+              placeholder="Ej: Aguinaldo"
+              className={inputClass}
+            />
+          </Field>
+
+          {movError && <p className="text-sm font-medium text-destructive">{movError}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditing(undefined)}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className={cn(
+                'flex-[2] rounded-2xl py-3.5 font-semibold text-white transition-transform active:translate-y-px',
+                movType === 'deposito' ? 'bg-positive' : 'bg-destructive',
+              )}
+            >
+              Guardar cambios
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <Trash2 className="size-4" />
+            Eliminar movimiento
+          </button>
         </form>
       </Sheet>
     </div>
