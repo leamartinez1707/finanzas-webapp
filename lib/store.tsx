@@ -41,6 +41,7 @@ import {
 interface AppState {
   currentUserId: string | null
   loading: boolean
+  busy: boolean
   members: Member[]
   households: Household[]
   expenses: Expense[]
@@ -91,6 +92,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [selectedContext, setSelectedContext] = useState<string>('personal')
+  const [busy, setBusy] = useState(false)
+
+  const wrapBusy = useCallback(<T extends (...args: any[]) => Promise<any>>(fn: T): T => {
+    return (async (...args: Parameters<T>) => {
+      setBusy(true)
+      try { return await fn(...args) } finally { setBusy(false) }
+    }) as T
+  }, [])
 
   // ─── load all data on mount ───────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -166,6 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       currentUserId,
       loading,
+      busy,
       members,
       households,
       expenses,
@@ -181,21 +191,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getMember: (id) => members.find((m) => m.id === id),
       getHousehold: (id) => households.find((h) => h.id === id),
 
-      addExpense: async (e) => {
+      addExpense: wrapBusy(async (e) => {
         const created = await addExpenseDB(e)
         setExpenses((prev) => [created, ...prev])
-      },
-      updateExpense: async (id, patch) => {
+      }),
+      updateExpense: wrapBusy(async (id, patch) => {
         await updateExpenseDB(id, patch)
         setExpenses((prev) =>
           prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
         )
-      },
-      deleteExpense: async (id) => {
+      }),
+      deleteExpense: wrapBusy(async (id) => {
         await deleteExpenseDB(id)
         setExpenses((prev) => prev.filter((e) => e.id !== id))
-      },
-      addContribution: async (goalId, memberId, amount) => {
+      }),
+      addContribution: wrapBusy(async (goalId, memberId, amount) => {
         await addContributionDB(goalId, memberId, amount)
         setGoals((prev) =>
           prev.map((g) =>
@@ -215,8 +225,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               : g,
           ),
         )
-      },
-      deleteContribution: async (id) => {
+      }),
+      deleteContribution: wrapBusy(async (id) => {
         await deleteContributionDB(id)
         setGoals((prev) =>
           prev.map((g) => ({
@@ -224,89 +234,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
             contributions: g.contributions.filter((c) => c.id !== id),
           })),
         )
-      },
-      addGoal: async (g) => {
+      }),
+      addGoal: wrapBusy(async (g) => {
         const created = await addGoalDB(g)
         setGoals((prev) => [created, ...prev])
-      },
-      updateGoal: async (id, patch) => {
+      }),
+      updateGoal: wrapBusy(async (id, patch) => {
         await updateGoalDB(id, patch)
         setGoals((prev) =>
           prev.map((g) => (g.id === id ? { ...g, ...patch } : g)),
         )
-      },
-      deleteGoal: async (id) => {
+      }),
+      deleteGoal: wrapBusy(async (id) => {
         await deleteGoalDB(id)
         setGoals((prev) => prev.filter((g) => g.id !== id))
-      },
-      addSavings: async (m) => {
+      }),
+      addSavings: wrapBusy(async (m) => {
         await addSavingsMovementDB(m)
         setSavings((prev) => [
           { ...m, id: crypto.randomUUID() },
           ...prev,
         ])
-      },
-      updateSavings: async (id, patch) => {
+      }),
+      updateSavings: wrapBusy(async (id, patch) => {
         await updateSavingsMovementDB(id, patch)
         setSavings((prev) =>
           prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         )
-      },
-      deleteSavings: async (id) => {
+      }),
+      deleteSavings: wrapBusy(async (id) => {
         await deleteSavingsMovementDB(id)
         setSavings((prev) => prev.filter((s) => s.id !== id))
-      },
-      createHousehold: async (name, currency) => {
+      }),
+      createHousehold: wrapBusy(async (name, currency) => {
         const id = await createHouseholdDB(name, currency)
-        // Refresh data
         await loadData()
         return id
-      },
-      addInvite: async (householdId, email) => {
+      }),
+      addInvite: wrapBusy(async (householdId, email) => {
         await addInviteDB(householdId, email)
-        // Reload households to get updated invites
         const user = await getCurrentUser()
         if (user) {
           const hh = await getMyHouseholds(user.id)
           setHouseholds(hh)
         }
-      },
-      updateInvite: async (householdId, inviteId, status) => {
+      }),
+      updateInvite: wrapBusy(async (householdId, inviteId, status) => {
         await updateInviteDB(householdId, inviteId, status)
         const user = await getCurrentUser()
         if (user) {
           const hh = await getMyHouseholds(user.id)
           setHouseholds(hh)
         }
-      },
-      removeInvite: async (householdId, inviteId) => {
+      }),
+      removeInvite: wrapBusy(async (householdId, inviteId) => {
         await removeInviteDB(inviteId)
         const user = await getCurrentUser()
         if (user) {
           const hh = await getMyHouseholds(user.id)
           setHouseholds(hh)
         }
-      },
-      updateHousehold: async (id, patch) => {
+      }),
+      updateHousehold: wrapBusy(async (id, patch) => {
         await updateHouseholdDB(id, patch)
         setHouseholds((prev) =>
           prev.map((h) => (h.id === id ? { ...h, ...patch } : h)),
         )
-      },
-      updateProfile: async (name, color) => {
+      }),
+      updateProfile: wrapBusy(async (name, color) => {
         await upsertProfile(name, color as any)
         setMembers((prev) =>
           prev.map((m) =>
             m.id === currentUserId ? { ...m, name, color: color as any } : m,
           ),
         )
-      },
+      }),
 
       refresh: loadData,
     }
   }, [
     currentUserId,
     loading,
+    busy,
     members,
     households,
     expenses,
@@ -314,6 +323,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     savings,
     selectedContext,
     loadData,
+    wrapBusy,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
