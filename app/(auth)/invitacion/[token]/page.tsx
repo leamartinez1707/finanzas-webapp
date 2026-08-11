@@ -88,24 +88,8 @@ export default function InvitacionPage({
         setHouseholdMembers(profiles ?? [])
       }
 
-      // If user is logged in, auto-accept
-      if (session?.user) {
-        await supabase
-          .from('household_invites')
-          .update({ estado: 'aceptada' })
-          .eq('id', inv.id)
-
-        // Add user as member (ignore if already)
-        await supabase.from('household_members').upsert({
-          household_id: inv.household_id,
-          user_id: session.user.id,
-        }, { onConflict: 'household_id,user_id' })
-
-        router.replace('/inicio')
-        return
-      }
-
-      setNeedsAuth(true)
+      // Use the session we already checked at the top
+      setNeedsAuth(!session?.user)
       setLoading(false)
     }
     load()

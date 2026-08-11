@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Plus, Receipt, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { isThisMonth } from '@/lib/format'
@@ -12,6 +13,12 @@ import { Money } from '@/components/money'
 import { PersonAvatar } from '@/components/person-avatar'
 import { SectionTitle } from '@/components/screen-header'
 import { EmptyState } from '@/components/empty-state'
+import { Sheet } from '@/components/sheet'
+import { Field, inputClass } from '@/components/field'
+import { PERSON_COLORS } from '@/lib/categories'
+import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
+import type { PersonColor } from '@/lib/types'
 
 export default function InicioPage() {
   const {
@@ -24,9 +31,40 @@ export default function InicioPage() {
     expenses,
     goals,
     savings,
+    updateProfile,
   } = useApp()
 
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const [profileColor, setProfileColor] = useState<PersonColor>('person-1')
+  const [pendingInvites, setPendingInvites] = useState<any[]>([])
+
+  useEffect(() => {
+    import('@/lib/supabase/queries').then(({ getMyPendingInvites }) => {
+      getMyPendingInvites().then(setPendingInvites)
+    })
+  }, [])
+
   if (loading || !currentUser) return null
+
+  function openProfile() {
+    if (!currentUser) return
+    setProfileName(currentUser.name)
+    setProfileColor(currentUser.color)
+    setProfileOpen(true)
+  }
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault()
+    await updateProfile(profileName.trim() || 'Yo', profileColor)
+    setProfileOpen(false)
+  }
+
+  async function signOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 
   const scopeFilter = isPersonal
     ? ({ scope: 'personal', ownerId: currentUser!.id } as const)
@@ -57,6 +95,31 @@ export default function InicioPage() {
 
   return (
     <div className="space-y-4 px-1">
+
+      {pendingInvites.length > 0 && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/8 p-4">
+          <div className="flex items-center gap-2">
+            <Bell className="size-4 text-primary" />
+            <p className="text-sm font-semibold text-primary">
+              {pendingInvites.length} invitación{pendingInvites.length !== 1 && 'es'} pendiente{pendingInvites.length !== 1 && 's'}
+            </p>
+          </div>
+          <div className="mt-2 space-y-2">
+            {pendingInvites.map((inv) => (
+              <Link
+                key={inv.id}
+                href={`/invitacion/${inv.token}`}
+                className="flex items-center justify-between rounded-xl bg-card p-2.5 ring-1 ring-border"
+              >
+                <span className="text-sm font-medium">
+                  Te invitaron a <strong>{(inv.household as any)?.nombre}</strong>
+                </span>
+                <span className="text-xs font-semibold text-primary">Ver →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       <header className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -66,11 +129,13 @@ export default function InicioPage() {
             {isPersonal ? 'Tus finanzas' : activeHousehold?.name}
           </h1>
         </div>
-        {currentUser && <PersonAvatar member={currentUser} size="lg" />}
+        <button onClick={openProfile}>
+          {currentUser && <PersonAvatar member={currentUser} size="lg" />}
+        </button>
       </header>
 
       {isPersonal ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-[28px] border border-border bg-card p-5">
             <p className="text-xs font-medium text-muted-foreground">Gasto del mes</p>
             <Money
@@ -92,7 +157,7 @@ export default function InicioPage() {
         <BalanceCard />
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:w-auto">
         <Link
           href="/gastos?nuevo=1"
           className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
@@ -152,6 +217,68 @@ export default function InicioPage() {
           />
         )}
       </section>
+
+      {/* Profile sheet */}
+      <Sheet open={profileOpen} onClose={() => setProfileOpen(false)} title="Tu perfil">
+        <form onSubmit={saveProfile} className="space-y-4">
+          <Field label="Nombre" htmlFor="profile-name">
+            <input
+              id="profile-name"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Color">
+            <div className="flex flex-wrap gap-3">
+              {PERSON_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setProfileColor(c)}
+                  className={cn(
+                    'inline-flex size-10 items-center justify-center rounded-full transition-transform',
+                    profileColor === c
+                      ? 'scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-background'
+                      : 'hover:scale-105',
+                  )}
+                  style={{ backgroundColor: `var(--${c})` }}
+                >
+                  {profileColor === c && <Check className="size-4 text-white" strokeWidth={3} />}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setProfileOpen(false)}
+              className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-[2] rounded-xl bg-primary py-3 font-semibold text-primary-foreground"
+            >
+              Guardar
+            </button>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={signOut}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 py-3 font-semibold text-destructive transition-colors hover:bg-destructive/10"
+            >
+              <LogOut className="size-4" />
+              Cerrar sesión
+            </button>
+          </div>
+        </form>
+      </Sheet>
     </div>
   )
 }

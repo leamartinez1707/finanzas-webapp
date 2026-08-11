@@ -9,7 +9,7 @@ export function AppHeader() {
   const { isPersonal } = useApp()
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-md md:max-w-4xl items-center justify-between gap-3 px-4 py-3 md:px-8">
         <ContextSwitcher />
         {!isPersonal && (
           <Link
@@ -17,7 +17,7 @@ export function AppHeader() {
             aria-label="Ajustes del hogar"
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-card text-muted-foreground shadow-sm ring-1 ring-border transition-colors hover:text-foreground"
           >
-            <Settings2 className="size-[18px]" />
+            <Settings2 className="size-4.5" />
           </Link>
         )}
       </div>

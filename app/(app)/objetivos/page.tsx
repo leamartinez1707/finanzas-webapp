@@ -117,7 +117,7 @@ export default function ObjetivosPage() {
 
       {/* --- list --- */}
       {scopedGoals.length > 0 ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-2">
           {scopedGoals.map((goal) => (
             <GoalCard key={goal.id} goal={goal} baseCurrency={activeCurrency} />
           ))}

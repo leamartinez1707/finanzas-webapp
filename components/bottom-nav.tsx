@@ -21,7 +21,7 @@ export function BottomNav() {
       className="sticky bottom-0 z-30 border-t border-border bg-card/85 backdrop-blur-lg"
       aria-label="Navegación principal"
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)] pt-1.5">
+      <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)] pt-1.5 md:max-w-xl md:px-8">
         {ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon

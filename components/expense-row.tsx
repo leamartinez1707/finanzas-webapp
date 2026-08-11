@@ -56,7 +56,7 @@ export function ExpenseRow({
           <span
             onClick={(e) => {
               e.stopPropagation()
-              if (!isSettled) toggleSettled(expense.id, true)
+              toggleSettled(expense.id, !isSettled)
             }}
             className={cn(
               'flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold transition-colors',
@@ -64,7 +64,7 @@ export function ExpenseRow({
                 ? 'bg-muted text-muted-foreground'
                 : 'bg-warning/20 text-warning-foreground hover:bg-primary/20 hover:text-primary cursor-pointer',
             )}
-            title={isSettled ? 'Saldado' : 'Click para marcar como saldado'}
+            title={isSettled ? 'Click para desmarcar' : 'Click para marcar como saldado'}
           >
             {isSettled ? (
               <>

@@ -49,13 +49,13 @@ function LoginForm() {
         options: { emailRedirectTo: `${location.origin}/auth/callback?next=${redirect || '/onboarding'}` },
       })
       if (err) return setError(err.message)
-      router.push(redirect || '/onboarding')
+      window.location.href = redirect || '/onboarding'
       return
     }
 
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) return setError(err.message)
-    router.push(redirect || '/inicio')
+    window.location.href = redirect || '/inicio'
   }
 
   return (

@@ -518,6 +518,21 @@ export async function removeInvite(inviteId: string) {
   await s.from('household_invites').delete().eq('id', inviteId)
 }
 
+export async function getMyPendingInvites(): Promise<any[]> {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user?.email) return []
+
+  const { data } = await s
+    .from('household_invites')
+    .select('*, household:households(nombre)')
+    .eq('email_invitado', user.email)
+    .eq('estado', 'pendiente')
+    .gt('expira_en', new Date().toISOString())
+
+  return data ?? []
+}
+
 // ─── Members / Profiles ────────────────────────────────────────────
 
 export async function getAllMembers(userIds: string[]): Promise<Member[]> {

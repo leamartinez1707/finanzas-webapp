@@ -143,7 +143,7 @@ export default function AhorrosPage() {
       />
 
       {hasAnySavings ? (
-        <div className="space-y-4">
+        <div className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
           {visibleMembers.map((member) => {
             if (!member) return null
             const balance = memberBalance(member.id)
