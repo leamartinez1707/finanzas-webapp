@@ -24,9 +24,13 @@ export default function InvitacionPage({
   const [household, setHousehold] = useState<any>(null)
   const [inviter, setInviter] = useState<any>(null)
   const [householdMembers, setHouseholdMembers] = useState<any[]>([])
+  const [needsAuth, setNeedsAuth] = useState(false)
 
   useEffect(() => {
     async function load() {
+      // Check if user is already logged in
+      const { data: { session } } = await supabase.auth.getSession()
+
       // Look up the invite by token
       const { data: inv } = await supabase
         .from('household_invites')
@@ -41,6 +45,16 @@ export default function InvitacionPage({
       }
 
       if (inv.estado === 'expirada' || new Date(inv.expira_en) < new Date()) {
+        if (inv.estado !== 'expirada') {
+          await supabase.from('household_invites').update({ estado: 'expirada' }).eq('id', inv.id)
+        }
+        setExpired(true)
+        setLoading(false)
+        return
+      }
+
+      // If already accepted
+      if (inv.estado === 'aceptada') {
         setExpired(true)
         setLoading(false)
         return
@@ -74,13 +88,49 @@ export default function InvitacionPage({
         setHouseholdMembers(profiles ?? [])
       }
 
+      // If user is logged in, auto-accept
+      if (session?.user) {
+        await supabase
+          .from('household_invites')
+          .update({ estado: 'aceptada' })
+          .eq('id', inv.id)
+
+        // Add user as member (ignore if already)
+        await supabase.from('household_members').upsert({
+          household_id: inv.household_id,
+          user_id: session.user.id,
+        }, { onConflict: 'household_id,user_id' })
+
+        router.replace('/inicio')
+        return
+      }
+
+      setNeedsAuth(true)
       setLoading(false)
     }
     load()
-  }, [token, supabase])
+  }, [token, supabase, router])
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   async function handleAccept() {
     if (!invite) return
+
+    // Check if user is logged in
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      // Redirect to register, then come back here
+      router.push(`/?redirect=/invitacion/${token}`)
+      return
+    }
+
     // Accept the invite
     await supabase
       .from('household_invites')
@@ -88,13 +138,10 @@ export default function InvitacionPage({
       .eq('id', invite.id)
 
     // Add user as member
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('household_members').insert({
-        household_id: invite.household_id,
-        user_id: user.id,
-      })
-    }
+    await supabase.from('household_members').insert({
+      household_id: invite.household_id,
+      user_id: user.id,
+    })
 
     router.push('/inicio')
   }
@@ -173,20 +220,41 @@ export default function InvitacionPage({
       </div>
 
       <div className="flex flex-col gap-2 pb-2">
-        <button
-          onClick={handleAccept}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
-        >
-          <Check className="size-5" />
-          Aceptar y unirme
-        </button>
-        <button
-          onClick={() => setRejected(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-base font-semibold text-muted-foreground transition-colors hover:bg-muted"
-        >
-          <X className="size-5" />
-          Rechazar
-        </button>
+        {needsAuth ? (
+          <>
+            <button
+              onClick={() => router.push(`/?redirect=/invitacion/${token}`)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
+            >
+              <Check className="size-5" />
+              Registrate o iniciá sesión para aceptar
+            </button>
+            <button
+              onClick={() => router.push('/bienvenida')}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-base font-semibold text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <X className="size-5" />
+              Rechazar
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleAccept}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
+            >
+              <Check className="size-5" />
+              Aceptar y unirme
+            </button>
+            <button
+              onClick={() => setRejected(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-base font-semibold text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <X className="size-5" />
+              Rechazar
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

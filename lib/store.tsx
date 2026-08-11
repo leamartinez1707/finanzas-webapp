@@ -20,6 +20,7 @@ import {
   addExpense as addExpenseDB,
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
+  toggleSettled as toggleSettledDB,
   addGoal as addGoalDB,
   updateGoal as updateGoalDB,
   deleteGoal as deleteGoalDB,
@@ -31,6 +32,7 @@ import {
   createHousehold as createHouseholdDB,
   updateHousehold as updateHouseholdDB,
   addInvite as addInviteDB,
+  resendInvite as resendInviteDB,
   updateInvite as updateInviteDB,
   removeInvite as removeInviteDB,
   upsertProfile,
@@ -61,6 +63,7 @@ interface AppState {
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
   updateExpense: (id: string, e: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
+  toggleSettled: (id: string, settled: boolean) => Promise<void>
   addContribution: (goalId: string, memberId: string, amount: number) => Promise<void>
   deleteContribution: (id: string) => Promise<void>
   addGoal: (g: Omit<Goal, 'id' | 'contributions'>) => Promise<void>
@@ -70,7 +73,7 @@ interface AppState {
   updateSavings: (id: string, patch: Partial<SavingsMovement>) => Promise<void>
   deleteSavings: (id: string) => Promise<void>
   createHousehold: (name: string, currency: CurrencyCode) => Promise<string>
-  addInvite: (householdId: string, email: string) => Promise<void>
+  addInvite: (householdId: string, email: string) => Promise<{ error?: string }>
   updateInvite: (householdId: string, inviteId: string, status: string) => Promise<void>
   removeInvite: (householdId: string, inviteId: string) => Promise<void>
   updateHousehold: (id: string, patch: Partial<Household>) => Promise<void>
@@ -205,6 +208,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await deleteExpenseDB(id)
         setExpenses((prev) => prev.filter((e) => e.id !== id))
       }),
+      toggleSettled: wrapBusy(async (id, settled) => {
+        await toggleSettledDB(id, settled)
+        setExpenses((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, settled } : e)),
+        )
+      }),
       addContribution: wrapBusy(async (goalId, memberId, amount) => {
         await addContributionDB(goalId, memberId, amount)
         setGoals((prev) =>
@@ -271,15 +280,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await loadData()
         return id
       }),
-      addInvite: wrapBusy(async (householdId, email) => {
-        await addInviteDB(householdId, email)
+      addInvite: wrapBusy(async (householdId, email): Promise<{ error?: string }> => {
+        const result = await addInviteDB(householdId, email)
         const user = await getCurrentUser()
         if (user) {
           const hh = await getMyHouseholds(user.id)
           setHouseholds(hh)
         }
+        return result as { error?: string }
       }),
       updateInvite: wrapBusy(async (householdId, inviteId, status) => {
+        // If re-sending (setting to pending again), send the email
+        if (status === 'pendiente') {
+          await resendInviteDB(inviteId)
+        }
         await updateInviteDB(householdId, inviteId, status)
         const user = await getCurrentUser()
         if (user) {

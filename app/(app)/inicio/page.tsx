@@ -76,7 +76,7 @@ export default function InicioPage() {
             <Money
               amount={personalMonth}
               currency={activeCurrency}
-              className="mt-1.5 block text-3xl text-negative"
+              className="mt-1.5 block text-3xl text-destructive"
             />
           </div>
           <div className="rounded-[28px] border border-border bg-card p-5">

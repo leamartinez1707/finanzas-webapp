@@ -49,6 +49,7 @@ export interface Expense {
   amount: number
   currency: CurrencyCode
   date: string // ISO date
+  settled: boolean
 }
 
 export interface Contribution {

@@ -38,7 +38,7 @@ export function BalanceCard() {
               ? 'bg-muted text-muted-foreground'
               : myNet > 0
                 ? 'bg-positive/15 text-positive'
-                : 'bg-negative/15 text-negative',
+                : 'bg-negative/15 text-destructive',
           )}
         >
           {settled ? 'Al día' : myNet > 0 ? 'Te deben' : 'Debés'}
@@ -50,7 +50,7 @@ export function BalanceCard() {
         currency={currency}
         className={cn(
           'mt-2 block text-[44px] leading-none',
-          settled ? 'text-foreground' : myNet > 0 ? 'text-positive' : 'text-negative',
+          settled ? 'text-foreground' : myNet > 0 ? 'text-positive' : 'text-destructive',
         )}
       />
       <p className="mt-2 text-sm text-pretty text-muted-foreground">

@@ -51,6 +51,7 @@ export function ExpenseForm({
       amount: value,
       currency,
       date: initial?.date ?? new Date().toISOString(),
+      settled: initial?.settled ?? false,
     })
   }
 

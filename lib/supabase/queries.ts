@@ -15,6 +15,7 @@ function toExpense(row: any): Expense {
     amount: Number(row.monto),
     currency: row.moneda as CurrencyCode,
     date: row.fecha,
+    settled: row.settled ?? false,
   }
 }
 
@@ -291,6 +292,11 @@ export async function deleteExpense(id: string) {
   await s.from('expenses').delete().eq('id', id)
 }
 
+export async function toggleSettled(id: string, settled: boolean) {
+  const s = supabase()
+  await s.from('expenses').update({ settled }).eq('id', id)
+}
+
 // ─── Goals ──────────────────────────────────────────────────────────
 
 export async function getGoals(filter: ExpenseFilter): Promise<Goal[]> {
@@ -423,10 +429,35 @@ export async function deleteSavingsMovement(id: string) {
 
 // ─── Invites ────────────────────────────────────────────────────────
 
-export async function addInvite(householdId: string, email: string): Promise<{ token: string; householdName: string; inviterName: string }> {
+async function sendInviteEmail(email: string, householdName: string, token: string, inviterName: string) {
+  try {
+    await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, householdName, token, inviterName }),
+    })
+  } catch {
+    console.warn('Failed to send invite email')
+  }
+}
+
+export async function addInvite(householdId: string, email: string): Promise<{ token: string; householdName: string; inviterName: string } | { error: string }> {
   const s = supabase()
   const { data: { user } } = await s.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  // Check for existing pending invite to this email in this household
+  const { data: existing } = await s
+    .from('household_invites')
+    .select('id, token, estado')
+    .eq('household_id', householdId)
+    .eq('email_invitado', email)
+    .order('creado_en', { ascending: false })
+    .limit(1)
+
+  if (existing?.length && existing[0].estado === 'pendiente') {
+    return { error: 'Ya hay una invitación pendiente para este email. Usá reenviar.' }
+  }
 
   // Get inviter name
   const { data: profile } = await s.from('profiles').select('nombre').eq('id', user.id).single()
@@ -445,19 +476,32 @@ export async function addInvite(householdId: string, email: string): Promise<{ t
 
   const token = invite?.token ?? ''
 
-  // Send email via Resend
-  try {
-    await fetch('/api/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, householdName, token, inviterName }),
-    })
-  } catch {
-    // Email failure shouldn't block the invite creation
-    console.warn('Failed to send invite email')
-  }
+  await sendInviteEmail(email, householdName, token, inviterName)
 
   return { token, householdName, inviterName }
+}
+
+export async function resendInvite(inviteId: string) {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Get invite details
+  const { data: invite } = await s
+    .from('household_invites')
+    .select('*, household:households(nombre)')
+    .eq('id', inviteId)
+    .single()
+
+  if (!invite) throw new Error('Invite not found')
+
+  // Get inviter name
+  const { data: profile } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  const inviterName = profile?.nombre ?? 'Alguien'
+
+  const householdName = (invite.household as any)?.nombre ?? 'un hogar'
+
+  await sendInviteEmail(invite.email_invitado, householdName, invite.token, inviterName)
 }
 
 export async function updateInvite(householdId: string, inviteId: string, status: string) {

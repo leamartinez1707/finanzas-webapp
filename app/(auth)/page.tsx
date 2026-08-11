@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Sparkles, ArrowRight } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { Field, inputClass } from '@/components/field'
@@ -9,7 +9,17 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect')
   const [mode, setMode] = useState<'password' | 'magic'>('password')
   const [isRegister, setIsRegister] = useState(false)
   const [magicSent, setMagicSent] = useState(false)
@@ -36,16 +46,16 @@ export default function LoginPage() {
       const { error: err } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${location.origin}/onboarding` },
+        options: { emailRedirectTo: `${location.origin}/auth/callback?next=${redirect || '/onboarding'}` },
       })
       if (err) return setError(err.message)
-      router.push('/onboarding')
+      router.push(redirect || '/onboarding')
       return
     }
 
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) return setError(err.message)
-    router.push('/inicio')
+    router.push(redirect || '/inicio')
   }
 
   return (

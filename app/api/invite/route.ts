@@ -11,7 +11,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
     }
 
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invitacion/${token}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
+    const inviteUrl = `${appUrl}/invitacion/${token}`
 
     const from = process.env.RESEND_FROM || 'Nido <onboarding@resend.dev>'
 

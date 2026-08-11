@@ -31,7 +31,7 @@ export function ActivityRow({
               ? 'bg-primary/12 text-primary'
               : item.direction === 'in'
                 ? 'bg-positive/12 text-positive'
-                : 'bg-negative/12 text-negative',
+                : 'bg-negative/12 text-destructive',
           )}
         >
           {item.kind === 'aporte' ? (
@@ -65,7 +65,7 @@ export function ActivityRow({
               ? 'text-foreground'
               : item.direction === 'in'
                 ? 'text-positive'
-                : 'text-negative',
+                : 'text-destructive',
           )}
         />
         {member && <PersonAvatar member={member} size="xs" />}

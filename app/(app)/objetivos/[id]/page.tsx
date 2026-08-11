@@ -10,8 +10,9 @@ import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
 import { goalSaved } from '@/components/goal-card'
-import { GoalForm } from '../goal-form'
 import { formatDate } from '@/lib/format'
+import { GoalForm } from '../goal-form'
+import type { Goal } from '@/lib/types'
 
 export default function GoalDetailPage() {
   const params = useParams()

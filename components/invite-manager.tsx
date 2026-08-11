@@ -21,6 +21,7 @@ const STATUS_META: Record<
 export function InviteManager({ householdId }: { householdId: string }) {
   const { getHousehold, members, addInvite, updateInvite, removeInvite } = useApp()
   const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
   const household = getHousehold(householdId)
   if (!household) return null
 
@@ -28,12 +29,17 @@ export function InviteManager({ householdId }: { householdId: string }) {
     .map((id) => members.find((m) => m.id === id)!)
     .filter(Boolean)
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const value = email.trim()
     if (!value) return
-    addInvite(householdId, value)
-    setEmail('')
+    setError('')
+    const result = await addInvite(householdId, value)
+    if (result?.error) {
+      setError(result.error)
+    } else {
+      setEmail('')
+    }
   }
 
   return (
@@ -57,6 +63,9 @@ export function InviteManager({ householdId }: { householdId: string }) {
           Invitar
         </button>
       </form>
+      {error && (
+        <p className="text-xs font-medium text-destructive">{error}</p>
+      )}
 
       {household.invites.length > 0 && (
         <div>

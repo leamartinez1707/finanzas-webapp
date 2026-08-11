@@ -206,6 +206,7 @@ export default function GastosPage() {
                     <ExpenseRow
                       expense={expense}
                       baseCurrency={activeCurrency}
+                      members={isPersonal ? 1 : householdMembers.length}
                       onClick={() => setEditing(expense)}
                     />
                   </li>
