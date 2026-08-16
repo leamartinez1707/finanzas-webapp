@@ -9,6 +9,7 @@ import { Field, inputClass } from '@/components/field'
 import { initials } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { PersonColor } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -16,10 +17,15 @@ export default function OnboardingPage() {
   const [name, setName] = useState('')
   const [color, setColor] = useState<PersonColor>('person-1')
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    updateProfile(name.trim() || 'Yo', color)
-    router.push('/bienvenida')
+    try {
+      await updateProfile(name.trim() || 'Yo', color)
+      showSuccess('Perfil guardado.')
+      router.push('/bienvenida')
+    } catch (error) {
+      showError(error)
+    }
   }
 
   const preview = name.trim() || 'Vos'

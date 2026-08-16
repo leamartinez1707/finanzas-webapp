@@ -19,6 +19,7 @@ import { PERSON_COLORS } from '@/lib/categories'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { PersonColor } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function InicioPage() {
   const {
@@ -31,6 +32,7 @@ export default function InicioPage() {
     expenses,
     goals,
     savings,
+    repayments,
     updateProfile,
   } = useApp()
 
@@ -42,7 +44,7 @@ export default function InicioPage() {
   useEffect(() => {
     import('@/lib/supabase/queries').then(({ getMyPendingInvites }) => {
       getMyPendingInvites().then(setPendingInvites)
-    })
+    }).catch(showError)
   }, [])
 
   if (loading || !currentUser) return null
@@ -56,14 +58,24 @@ export default function InicioPage() {
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault()
-    await updateProfile(profileName.trim() || 'Yo', profileColor)
-    setProfileOpen(false)
+    try {
+      await updateProfile(profileName.trim() || 'Yo', profileColor)
+      showSuccess('Perfil actualizado.')
+      setProfileOpen(false)
+    } catch (error) {
+      showError(error)
+    }
   }
 
   async function signOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      window.location.href = '/'
+    } catch (error) {
+      showError(error)
+    }
   }
 
   const scopeFilter = isPersonal
@@ -71,7 +83,7 @@ export default function InicioPage() {
     : ({ scope: 'household', householdId: activeHousehold!.id } as const)
 
   const activity = buildActivity(
-    { expenses, goals, savings, members, baseCurrency: activeCurrency },
+    { expenses, goals, savings, repayments, members, baseCurrency: activeCurrency },
     scopeFilter,
   ).slice(0, 5)
 
@@ -134,89 +146,93 @@ export default function InicioPage() {
         </button>
       </header>
 
-      {isPersonal ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-[28px] border border-border bg-card p-5">
-            <p className="text-xs font-medium text-muted-foreground">Gasto del mes</p>
-            <Money
-              amount={personalMonth}
-              currency={activeCurrency}
-              className="mt-1.5 block text-3xl text-destructive"
-            />
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-8">
+        <div>
+          {isPersonal ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
+                <p className="text-xs font-medium text-muted-foreground">Gasto del mes</p>
+                <Money
+                  amount={personalMonth}
+                  currency={activeCurrency}
+                  className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-destructive"
+                />
+              </div>
+              <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
+                <p className="text-xs font-medium text-muted-foreground">Ahorros</p>
+                <Money
+                  amount={personalSavings}
+                  currency={activeCurrency}
+                  className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-positive"
+                />
+              </div>
+            </div>
+          ) : (
+            <BalanceCard />
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-3 md:w-auto">
+            <Link
+              href="/gastos?nuevo=1"
+              className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+            >
+              <Plus className="size-5" />
+              Nuevo gasto
+            </Link>
+            <Link
+              href="/objetivos"
+              className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3.5 font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-muted"
+            >
+              <Sparkles className="size-5 text-primary" />
+              Objetivos
+            </Link>
           </div>
-          <div className="rounded-[28px] border border-border bg-card p-5">
-            <p className="text-xs font-medium text-muted-foreground">Ahorros</p>
-            <Money
-              amount={personalSavings}
-              currency={activeCurrency}
-              className="mt-1.5 block text-3xl text-positive"
-            />
-          </div>
+
+          {topGoal && (
+            <section className="mt-6">
+              <SectionTitle
+                action={
+                  <Link href="/objetivos" className="text-sm font-medium text-primary">
+                    Ver todos
+                  </Link>
+                }
+              >
+                Objetivo destacado
+              </SectionTitle>
+              <GoalCard goal={topGoal} baseCurrency={activeCurrency} />
+            </section>
+          )}
         </div>
-      ) : (
-        <BalanceCard />
-      )}
 
-      <div className="grid grid-cols-2 gap-3 md:w-auto">
-        <Link
-          href="/gastos?nuevo=1"
-          className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
-        >
-          <Plus className="size-5" />
-          Nuevo gasto
-        </Link>
-        <Link
-          href="/objetivos"
-          className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3.5 font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-muted"
-        >
-          <Sparkles className="size-5 text-primary" />
-          Objetivos
-        </Link>
-      </div>
-
-      {topGoal && (
-        <section>
+        <section className="mt-6 lg:mt-0">
           <SectionTitle
             action={
-              <Link href="/objetivos" className="text-sm font-medium text-primary">
-                Ver todos
+              <Link
+                href="/historial"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary"
+              >
+                Historial
+                <ArrowRight className="size-3.5" />
               </Link>
             }
           >
-            Objetivo destacado
+            Actividad reciente
           </SectionTitle>
-          <GoalCard goal={topGoal} baseCurrency={activeCurrency} />
+          {activity.length > 0 ? (
+            <ul className="flex flex-col gap-2">
+              {activity.map((item) => (
+                <ActivityRow key={item.id} item={item} baseCurrency={activeCurrency} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              icon={Receipt}
+              title="Todavía no hay movimientos"
+              description="Cuando registres un gasto, un aporte o un ahorro, va a aparecer acá."
+            />
+          )}
         </section>
-      )}
-
-      <section>
-        <SectionTitle
-          action={
-            <Link
-              href="/historial"
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary"
-            >
-              Historial
-              <ArrowRight className="size-3.5" />
-            </Link>
-          }
-        >
-          Actividad reciente
-        </SectionTitle>
-        {activity.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {activity.map((item) => (
-              <ActivityRow key={item.id} item={item} baseCurrency={activeCurrency} />
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            icon={Receipt}
-            title="Todavía no hay movimientos"
-            description="Cuando registres un gasto, un aporte o un ahorro, va a aparecer acá."
-          />
-        )}
-      </section>
+      </div>
 
       {/* Profile sheet */}
       <Sheet open={profileOpen} onClose={() => setProfileOpen(false)} title="Tu perfil">

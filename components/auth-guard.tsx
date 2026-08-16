@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { showError } from '@/lib/toast'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -11,12 +12,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        showError(error)
+        router.replace('/')
+        return
+      }
       if (!session) {
         router.replace('/')
       } else {
         setReady(true)
       }
+    }).catch((error) => {
+      showError(error)
+      router.replace('/')
     })
   }, [router])
 

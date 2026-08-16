@@ -14,6 +14,7 @@ import { Sheet } from '@/components/sheet'
 import { monthKey, monthLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { CategoryId, Expense } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function GastosPage() {
   const {
@@ -68,21 +69,39 @@ export default function GastosPage() {
   }, [scopedExpenses])
 
   // --- handlers ---
-  function handleAdd(data: Omit<Expense, 'id'>) {
-    addExpense(data)
+  async function handleAdd(data: Omit<Expense, 'id'>) {
+    try {
+      await addExpense(data)
+      showSuccess('Gasto agregado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setAdding(false)
     setEditing(undefined)
   }
 
-  function handleUpdate(data: Omit<Expense, 'id'>) {
+  async function handleUpdate(data: Omit<Expense, 'id'>) {
     if (!editing) return
-    updateExpense(editing.id, data)
+    try {
+      await updateExpense(editing.id, data)
+      showSuccess('Gasto actualizado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(undefined)
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!editing) return
-    deleteExpense(editing.id)
+    try {
+      await deleteExpense(editing.id)
+      showSuccess('Gasto eliminado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(undefined)
   }
 

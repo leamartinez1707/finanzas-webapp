@@ -8,8 +8,8 @@ import { useApp } from '@/lib/store'
 export function AppHeader() {
   const { isPersonal } = useApp()
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-md md:max-w-4xl items-center justify-between gap-3 px-4 py-3 md:px-8">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-lg lg:hidden">
+      <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
         <ContextSwitcher />
         {!isPersonal && (
           <Link

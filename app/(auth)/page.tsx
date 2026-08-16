@@ -7,6 +7,8 @@ import { Logo } from '@/components/brand'
 import { Field, inputClass } from '@/components/field'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getSpanishErrorMessage } from '@/lib/error-message'
+import { showSuccess } from '@/lib/toast'
 
 export default function LoginPage() {
   return (
@@ -37,8 +39,9 @@ function LoginForm() {
         email,
         options: { emailRedirectTo: `${location.origin}/inicio` },
       })
-      if (err) return setError(err.message)
-      setMagicSent(true)
+       if (err) return setError(getSpanishErrorMessage(err))
+       setMagicSent(true)
+       showSuccess('Te enviamos el link de acceso.')
       return
     }
 
@@ -48,14 +51,14 @@ function LoginForm() {
         password,
         options: { emailRedirectTo: `${location.origin}/auth/callback?next=${redirect || '/onboarding'}` },
       })
-      if (err) return setError(err.message)
-      window.location.href = redirect || '/onboarding'
+        if (err) return setError(getSpanishErrorMessage(err))
+       window.location.href = redirect || '/onboarding'
       return
     }
 
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
-    if (err) return setError(err.message)
-    window.location.href = redirect || '/inicio'
+      const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+      if (err) return setError(getSpanishErrorMessage(err))
+      window.location.href = redirect || '/inicio'
   }
 
   return (

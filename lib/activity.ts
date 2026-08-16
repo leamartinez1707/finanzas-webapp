@@ -5,6 +5,7 @@ import type {
   Goal,
   Member,
   SavingsMovement,
+  Repayment,
 } from './types'
 import { CATEGORIES } from './categories'
 
@@ -12,13 +13,14 @@ interface BuildArgs {
   expenses: Expense[]
   goals: Goal[]
   savings: SavingsMovement[]
+  repayments: Repayment[]
   members: Member[]
   baseCurrency: CurrencyCode
 }
 
 // Builds a unified, date-sorted activity feed for a given scope.
 export function buildActivity(
-  { expenses, goals, savings, members, baseCurrency }: BuildArgs,
+  { expenses, goals, savings, repayments, members, baseCurrency }: BuildArgs,
   filter: { scope: 'household'; householdId: string } | { scope: 'personal'; ownerId: string },
 ): ActivityItem[] {
   const name = (id: string) => members.find((m) => m.id === id)?.name ?? 'Alguien'
@@ -85,6 +87,22 @@ export function buildActivity(
       date: s.date,
       direction: s.type === 'deposito' ? 'in' : 'out',
     })
+  }
+
+  if (filter.scope === 'household') {
+    for (const r of repayments.filter((item) => item.householdId === filter.householdId)) {
+      items.push({
+        id: r.id,
+        kind: 'pago',
+        memberId: r.fromId,
+        title: `${name(r.fromId)} le pagó a ${name(r.toId)}`,
+        subtitle: r.note ? `Pago real · ${r.note}` : 'Pago real registrado',
+        amount: r.amount,
+        currency: r.currency,
+        date: r.date,
+        direction: 'out',
+      })
+    }
   }
 
   return items.sort((a, b) => +new Date(b.date) - +new Date(a.date))

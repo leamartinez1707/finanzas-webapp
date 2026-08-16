@@ -9,18 +9,21 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { CurrencyCode, Expense, Goal, Household, Member, SavingsMovement } from './types'
+import type { CurrencyCode, Expense, Goal, Household, Member, Repayment, SavingsMovement } from './types'
 import {
   getCurrentUser,
   getMyHouseholds,
   getExpenses,
   getGoals,
   getSavings,
+  getRepayments,
   getAllMembers,
   addExpense as addExpenseDB,
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
-  toggleSettled as toggleSettledDB,
+  addRepayment as addRepaymentDB,
+  updateRepayment as updateRepaymentDB,
+  deleteRepayment as deleteRepaymentDB,
   addGoal as addGoalDB,
   updateGoal as updateGoalDB,
   deleteGoal as deleteGoalDB,
@@ -39,16 +42,19 @@ import {
   getHouseholdMembers,
   type ExpenseFilter,
 } from './supabase/queries'
+import { showError } from './toast'
 
 interface AppState {
   currentUserId: string | null
   loading: boolean
+  loadError: unknown
   busy: boolean
   members: Member[]
   households: Household[]
   expenses: Expense[]
   goals: Goal[]
   savings: SavingsMovement[]
+  repayments: Repayment[]
   selectedContext: string
   setSelectedContext: (id: string) => void
 
@@ -63,7 +69,9 @@ interface AppState {
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
   updateExpense: (id: string, e: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
-  toggleSettled: (id: string, settled: boolean) => Promise<void>
+  addRepayment: (r: Omit<Repayment, 'id' | 'createdById'>) => Promise<void>
+  updateRepayment: (id: string, patch: Partial<Repayment>) => Promise<void>
+  deleteRepayment: (id: string) => Promise<void>
   addContribution: (goalId: string, memberId: string, amount: number) => Promise<void>
   deleteContribution: (id: string) => Promise<void>
   addGoal: (g: Omit<Goal, 'id' | 'contributions'>) => Promise<void>
@@ -89,11 +97,13 @@ const DEFAULT_CURRENCY: CurrencyCode = 'UYU'
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [households, setHouseholds] = useState<Household[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
+  const [repayments, setRepayments] = useState<Repayment[]>([])
   const [selectedContext, setSelectedContext] = useState<string>('personal')
   const [busy, setBusy] = useState(false)
 
@@ -106,11 +116,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ─── load all data on mount ───────────────────────────────────────
   const loadData = useCallback(async () => {
-    const user = await getCurrentUser()
-    if (!user) {
-      setLoading(false)
-      return
-    }
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const user = await getCurrentUser()
+      if (!user) {
+        setLoading(false)
+        return
+      }
 
     setCurrentUserId(user.id)
     setMembers([user])
@@ -136,6 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const allExpenses: Expense[] = []
     const allGoals: Goal[] = []
     const allSavings: SavingsMovement[] = []
+    const allRepayments: Repayment[] = []
 
     // Personal
     const personalFilter: ExpenseFilter = { scope: 'personal', ownerId: user.id }
@@ -148,6 +162,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       allExpenses.push(...(await getExpenses(hhFilter)))
       allGoals.push(...(await getGoals(hhFilter)))
       allSavings.push(...(await getSavings(hhFilter, h.memberIds)))
+      allRepayments.push(...(await getRepayments(h.id)))
     }
 
     // Personal savings
@@ -158,11 +173,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenses(allExpenses)
     setGoals(allGoals)
     setSavings(allSavings)
-    setLoading(false)
+    setRepayments(allRepayments)
+      setLoading(false)
+    } catch (error) {
+      setLoading(false)
+      setLoadError(error)
+      showError(error)
+      throw error
+    }
   }, [selectedContext])
 
   useEffect(() => {
-    loadData()
+    loadData().catch(() => undefined)
   }, [])
 
   // ─── derived ──────────────────────────────────────────────────────
@@ -175,15 +197,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ? DEFAULT_CURRENCY
       : activeHousehold?.currency ?? DEFAULT_CURRENCY
 
-    return {
-      currentUserId,
-      loading,
+      return {
+        currentUserId,
+        loading,
+        loadError,
       busy,
       members,
       households,
       expenses,
       goals,
       savings,
+      repayments,
       selectedContext,
       setSelectedContext,
       currentUser,
@@ -208,11 +232,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await deleteExpenseDB(id)
         setExpenses((prev) => prev.filter((e) => e.id !== id))
       }),
-      toggleSettled: wrapBusy(async (id, settled) => {
-        await toggleSettledDB(id, settled)
-        setExpenses((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, settled } : e)),
-        )
+      addRepayment: wrapBusy(async (r) => {
+        const created = await addRepaymentDB(r)
+        setRepayments((prev) => [created, ...prev])
+      }),
+      updateRepayment: wrapBusy(async (id, patch) => {
+        await updateRepaymentDB(id, patch)
+        setRepayments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+      }),
+      deleteRepayment: wrapBusy(async (id) => {
+        await deleteRepaymentDB(id)
+        setRepayments((prev) => prev.filter((r) => r.id !== id))
       }),
       addContribution: wrapBusy(async (goalId, memberId, amount) => {
         await addContributionDB(goalId, memberId, amount)
@@ -329,12 +359,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [
     currentUserId,
     loading,
+    loadError,
     busy,
     members,
     households,
     expenses,
     goals,
     savings,
+    repayments,
     selectedContext,
     loadData,
     wrapBusy,

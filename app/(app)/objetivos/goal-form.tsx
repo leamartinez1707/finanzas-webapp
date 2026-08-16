@@ -12,7 +12,7 @@ export function GoalForm({
   onCancel,
 }: {
   initial?: Goal
-  onSubmit: (data: Omit<Goal, 'id' | 'contributions'>) => void
+  onSubmit: (data: Omit<Goal, 'id' | 'contributions'>) => void | Promise<void>
   onCancel?: () => void
 }) {
   const { isPersonal, activeHousehold, currentUser, activeCurrency } = useApp()

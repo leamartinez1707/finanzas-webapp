@@ -1,5 +1,5 @@
 import { createClient } from './client'
-import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor } from '../types'
+import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -77,6 +77,21 @@ function toSavings(row: any): SavingsMovement {
     amount: Number(row.monto),
     date: row.fecha,
     note: row.nota ?? undefined,
+  }
+}
+
+function toRepayment(row: any): Repayment {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    fromId: row.from_id,
+    toId: row.to_id,
+    amount: Number(row.amount),
+    currency: row.currency as CurrencyCode,
+    date: row.date,
+    note: row.note ?? undefined,
+    expenseId: row.expense_id ?? undefined,
+    createdById: row.created_by,
   }
 }
 
@@ -284,17 +299,102 @@ export async function updateExpense(id: string, patch: Partial<Expense>) {
   if (patch.payerId !== undefined) update.payer_id = patch.payerId
   if (patch.date !== undefined) update.fecha = patch.date
 
-  await s.from('expenses').update(update).eq('id', id)
+  const { error } = await s.from('expenses').update(update).eq('id', id)
+  if (error) throw error
 }
 
 export async function deleteExpense(id: string) {
   const s = supabase()
-  await s.from('expenses').delete().eq('id', id)
+  const { error } = await s.from('expenses').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getRepayments(householdId: string): Promise<Repayment[]> {
+  const { data, error } = await supabase().from('repayments').select('*').eq('household_id', householdId).order('date', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(toRepayment)
+}
+
+async function validateRepaymentExpense(
+  s: ReturnType<typeof supabase>,
+  householdId: string,
+  expenseId: string | null | undefined,
+  currency: CurrencyCode,
+) {
+  if (!expenseId) return
+
+  const { data, error } = await s
+    .from('expenses')
+    .select('household_id, scope, moneda')
+    .eq('id', expenseId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data || data.household_id !== householdId || data.scope !== 'household' || data.moneda !== currency) {
+    throw new Error('El gasto relacionado no pertenece al hogar o no coincide con la moneda')
+  }
+}
+
+export async function addRepayment(r: Omit<Repayment, 'id' | 'createdById'>): Promise<Repayment> {
+  const s = supabase()
+  const { data: { user }, error: userError } = await s.auth.getUser()
+  if (userError) throw userError
+  if (!user) throw new Error('Not authenticated')
+  await validateRepaymentExpense(s, r.householdId, r.expenseId, r.currency)
+  const { data, error } = await s.from('repayments').insert({
+    household_id: r.householdId,
+    from_id: r.fromId,
+    to_id: r.toId,
+    amount: r.amount,
+    currency: r.currency,
+    date: r.date,
+    note: r.note ?? null,
+    expense_id: r.expenseId ?? null,
+    created_by: user.id,
+  }).select('*').single()
+  if (error) throw error
+  return toRepayment(data)
+}
+
+export async function updateRepayment(id: string, patch: Partial<Repayment>) {
+  const s = supabase()
+  const { data: current, error: currentError } = await s
+    .from('repayments')
+    .select('household_id, currency, expense_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (currentError) throw currentError
+  if (!current) throw new Error('Repayment not found or not accessible')
+
+  const update: Record<string, unknown> = {}
+  if (patch.fromId !== undefined) update.from_id = patch.fromId
+  if (patch.toId !== undefined) update.to_id = patch.toId
+  if (patch.amount !== undefined) update.amount = patch.amount
+  if (patch.currency !== undefined) update.currency = patch.currency
+  if (patch.date !== undefined) update.date = patch.date
+  if (patch.note !== undefined) update.note = patch.note ?? null
+  if (patch.expenseId !== undefined) update.expense_id = patch.expenseId
+  await validateRepaymentExpense(
+    s,
+    current.household_id,
+    patch.expenseId === undefined ? current.expense_id ?? undefined : patch.expenseId,
+    patch.currency ?? current.currency,
+  )
+  const { data, error } = await s.from('repayments').update(update).eq('id', id).select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('Repayment not found or not accessible')
+}
+
+export async function deleteRepayment(id: string) {
+  const { data, error } = await supabase().from('repayments').delete().eq('id', id).select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('Repayment not found or not accessible')
 }
 
 export async function toggleSettled(id: string, settled: boolean) {
   const s = supabase()
-  await s.from('expenses').update({ settled }).eq('id', id)
+  const { error } = await s.from('expenses').update({ settled }).eq('id', id)
+  if (error) throw error
 }
 
 // ─── Goals ──────────────────────────────────────────────────────────
@@ -353,27 +453,32 @@ export async function updateGoal(id: string, patch: Partial<Goal>) {
   if (patch.currency !== undefined) update.moneda = patch.currency
   if (patch.deadline !== undefined) update.fecha_limite = patch.deadline ?? null
 
-  await s.from('goals').update(update).eq('id', id)
+  const { error } = await s.from('goals').update(update).eq('id', id)
+  if (error) throw error
 }
 
 export async function deleteGoal(id: string) {
   const s = supabase()
-  await s.from('goal_contributions').delete().eq('goal_id', id)
-  await s.from('goals').delete().eq('id', id)
+  const { error: contributionsError } = await s.from('goal_contributions').delete().eq('goal_id', id)
+  if (contributionsError) throw contributionsError
+  const { error } = await s.from('goals').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function addContribution(goalId: string, userId: string, amount: number) {
   const s = supabase()
-  await s.from('goal_contributions').insert({
+  const { error } = await s.from('goal_contributions').insert({
     goal_id: goalId,
     user_id: userId,
     monto: amount,
   })
+  if (error) throw error
 }
 
 export async function deleteContribution(id: string) {
   const s = supabase()
-  await s.from('goal_contributions').delete().eq('id', id)
+  const { error } = await s.from('goal_contributions').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ─── Savings ────────────────────────────────────────────────────────
@@ -400,7 +505,7 @@ export async function getSavings(
 
 export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
   const s = supabase()
-  await s.from('savings_movements').insert({
+  const { error } = await s.from('savings_movements').insert({
     user_id: m.memberId,
     scope: m.scope,
     household_id: m.householdId ?? null,
@@ -409,6 +514,7 @@ export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
     fecha: m.date,
     nota: m.note ?? null,
   })
+  if (error) throw error
 }
 
 export async function updateSavingsMovement(id: string, patch: Partial<SavingsMovement>) {
@@ -419,25 +525,26 @@ export async function updateSavingsMovement(id: string, patch: Partial<SavingsMo
   if (patch.date !== undefined) update.fecha = patch.date
   if (patch.note !== undefined) update.nota = patch.note
 
-  await s.from('savings_movements').update(update).eq('id', id)
+  const { error } = await s.from('savings_movements').update(update).eq('id', id)
+  if (error) throw error
 }
 
 export async function deleteSavingsMovement(id: string) {
   const s = supabase()
-  await s.from('savings_movements').delete().eq('id', id)
+  const { error } = await s.from('savings_movements').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ─── Invites ────────────────────────────────────────────────────────
 
 async function sendInviteEmail(email: string, householdName: string, token: string, inviterName: string) {
-  try {
-    await fetch('/api/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, householdName, token, inviterName }),
-    })
-  } catch {
-    console.warn('Failed to send invite email')
+  const response = await fetch('/api/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, householdName, token, inviterName }),
+  })
+  if (!response.ok) {
+    throw new Error(`Invite email failed: ${response.status}`)
   }
 }
 
@@ -468,15 +575,25 @@ export async function addInvite(householdId: string, email: string): Promise<{ t
   const householdName = hh?.nombre ?? 'un hogar'
 
   // Insert invite
-  const { data: invite } = await s.from('household_invites').insert({
+  const { data: invite, error: inviteError } = await s.from('household_invites').insert({
     household_id: householdId,
     email_invitado: email,
     invitado_por: user.id,
-  }).select('token').single()
+  }).select('id, token').single()
+  if (inviteError) throw inviteError
 
-  const token = invite?.token ?? ''
+  const token = invite.token
 
-  await sendInviteEmail(email, householdName, token, inviterName)
+  try {
+    await sendInviteEmail(email, householdName, token, inviterName)
+  } catch (emailError) {
+    try {
+      await s.from('household_invites').delete().eq('id', invite.id)
+    } catch {
+      // Keep the original email error so the UI can show the right message.
+    }
+    throw emailError
+  }
 
   return { token, householdName, inviterName }
 }
@@ -506,30 +623,34 @@ export async function resendInvite(inviteId: string) {
 
 export async function updateInvite(householdId: string, inviteId: string, status: string) {
   const s = supabase()
-  await s
+  const { error } = await s
     .from('household_invites')
     .update({ estado: status })
     .eq('id', inviteId)
     .eq('household_id', householdId)
+  if (error) throw error
 }
 
 export async function removeInvite(inviteId: string) {
   const s = supabase()
-  await s.from('household_invites').delete().eq('id', inviteId)
+  const { error } = await s.from('household_invites').delete().eq('id', inviteId)
+  if (error) throw error
 }
 
 export async function getMyPendingInvites(): Promise<any[]> {
   const s = supabase()
-  const { data: { user } } = await s.auth.getUser()
+  const { data: { user }, error: userError } = await s.auth.getUser()
+  if (userError) throw userError
   if (!user?.email) return []
 
-  const { data } = await s
+  const { data, error } = await s
     .from('household_invites')
     .select('*, household:households(nombre)')
     .eq('email_invitado', user.email)
     .eq('estado', 'pendiente')
     .gt('expira_en', new Date().toISOString())
 
+  if (error) throw error
   return data ?? []
 }
 

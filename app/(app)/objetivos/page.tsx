@@ -10,6 +10,7 @@ import { Sheet } from '@/components/sheet'
 import { GoalForm } from './goal-form'
 import { cn } from '@/lib/utils'
 import type { Goal } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function ObjetivosPage() {
   const {
@@ -43,8 +44,14 @@ export default function ObjetivosPage() {
     })
   }, [goals, isPersonal, currentUser?.id, activeHousehold, filter])
 
-  function handleCreate(data: Omit<Goal, 'id' | 'contributions'>) {
-    addGoal(data)
+  async function handleCreate(data: Omit<Goal, 'id' | 'contributions'>) {
+    try {
+      await addGoal(data)
+      showSuccess('Objetivo creado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setAdding(false)
   }
 

@@ -8,6 +8,7 @@ import { Field, inputClass } from '@/components/field'
 import { CurrencySelect } from '@/components/currency-select'
 import { InviteManager } from '@/components/invite-manager'
 import type { CurrencyCode } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function CrearHogarPage() {
   const router = useRouter()
@@ -19,10 +20,15 @@ export default function CrearHogarPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const id = await createHousehold(name.trim() || 'Mi hogar', currency)
-    setNewId(id)
-    setSelectedContext(id)
-    setStep('invite')
+    try {
+      const id = await createHousehold(name.trim() || 'Mi hogar', currency)
+      setNewId(id)
+      setSelectedContext(id)
+      setStep('invite')
+      showSuccess('Hogar creado.')
+    } catch (error) {
+      showError(error)
+    }
   }
 
   return (

@@ -7,6 +7,7 @@ import { Logo } from '@/components/brand'
 import { PersonAvatar, AvatarStack } from '@/components/person-avatar'
 import { useApp } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function InvitacionPage({
   params,
@@ -25,74 +26,84 @@ export default function InvitacionPage({
   const [inviter, setInviter] = useState<any>(null)
   const [householdMembers, setHouseholdMembers] = useState<any[]>([])
   const [needsAuth, setNeedsAuth] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     async function load() {
-      // Check if user is already logged in
-      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        // Check if user is already logged in
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
 
-      // Look up the invite by token
-      const { data: inv } = await supabase
-        .from('household_invites')
-        .select('*, household:households(*)')
-        .eq('token', token)
-        .single()
-
-      if (!inv) {
-        setExpired(true)
-        setLoading(false)
-        return
-      }
-
-      if (inv.estado === 'expirada' || new Date(inv.expira_en) < new Date()) {
-        if (inv.estado !== 'expirada') {
-          await supabase.from('household_invites').update({ estado: 'expirada' }).eq('id', inv.id)
-        }
-        setExpired(true)
-        setLoading(false)
-        return
-      }
-
-      // If already accepted
-      if (inv.estado === 'aceptada') {
-        setExpired(true)
-        setLoading(false)
-        return
-      }
-
-      setInvite(inv)
-      setHousehold(inv.household)
-
-      // Get inviter profile
-      if (inv.invitado_por) {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', inv.invitado_por)
+        // Look up the invite by token
+        const { data: inv, error: inviteError } = await supabase
+          .from('household_invites')
+          .select('*, household:households(*)')
+          .eq('token', token)
           .single()
-        setInviter(prof)
+        if (inviteError) throw inviteError
+
+        if (!inv) {
+          setExpired(true)
+          return
+        }
+
+        if (inv.estado === 'expirada' || new Date(inv.expira_en) < new Date()) {
+          if (inv.estado !== 'expirada') {
+            const { error } = await supabase.from('household_invites').update({ estado: 'expirada' }).eq('id', inv.id)
+            if (error) throw error
+          }
+          setExpired(true)
+          return
+        }
+
+        // If already accepted
+        if (inv.estado === 'aceptada') {
+          setExpired(true)
+          return
+        }
+
+        setInvite(inv)
+        setHousehold(inv.household)
+
+        // Get inviter profile
+        if (inv.invitado_por) {
+          const { data: prof, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', inv.invitado_por)
+            .single()
+          if (error) throw error
+          setInviter(prof)
+        }
+
+        // Get members of the household
+        const { data: memberships, error: membershipsError } = await supabase
+          .from('household_members')
+          .select('user_id')
+          .eq('household_id', inv.household_id)
+        if (membershipsError) throw membershipsError
+
+        if (memberships) {
+          const ids = memberships.map((m) => m.user_id)
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', ids)
+          if (profilesError) throw profilesError
+          setHouseholdMembers(profiles ?? [])
+        }
+
+        // Use the session we already checked at the top
+        setNeedsAuth(!session?.user)
+      } catch (error) {
+        setLoadError(true)
+        showError(error)
+      } finally {
+        setLoading(false)
       }
-
-      // Get members of the household
-      const { data: memberships } = await supabase
-        .from('household_members')
-        .select('user_id')
-        .eq('household_id', inv.household_id)
-
-      if (memberships) {
-        const ids = memberships.map((m) => m.user_id)
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', ids)
-        setHouseholdMembers(profiles ?? [])
-      }
-
-      // Use the session we already checked at the top
-      setNeedsAuth(!session?.user)
-      setLoading(false)
     }
-    load()
+    void load()
   }, [token, supabase, router])
 
   if (loading) {
@@ -103,31 +114,60 @@ export default function InvitacionPage({
     )
   }
 
+  if (loadError) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <h1 className="text-2xl font-bold tracking-tight">No pudimos cargar la invitación</h1>
+        <p className="mt-2 max-w-xs text-pretty leading-relaxed text-muted-foreground">
+          Intentá abrir este link nuevamente.
+        </p>
+      </div>
+    )
+  }
+
   async function handleAccept() {
     if (!invite) return
 
-    // Check if user is logged in
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      // Check if user is logged in
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
 
-    if (!user) {
-      // Redirect to register, then come back here
-      router.push(`/?redirect=/invitacion/${token}`)
-      return
+      if (!user) {
+        // Redirect to register, then come back here
+        router.push(`/?redirect=/invitacion/${token}`)
+        return
+      }
+
+      // Accept the invite
+      const { error: inviteError } = await supabase
+        .from('household_invites')
+        .update({ estado: 'aceptada' })
+        .eq('id', invite.id)
+      if (inviteError) {
+        showError(inviteError)
+        return
+      }
+
+      // Add user as member
+      const { error: memberError } = await supabase.from('household_members').insert({
+        household_id: invite.household_id,
+        user_id: user.id,
+      })
+      if (memberError) {
+        await supabase
+          .from('household_invites')
+          .update({ estado: 'pendiente' })
+          .eq('id', invite.id)
+        showError(memberError)
+        return
+      }
+
+      showSuccess('Te sumaste al hogar.')
+      router.push('/inicio')
+    } catch (error) {
+      showError(error)
     }
-
-    // Accept the invite
-    await supabase
-      .from('household_invites')
-      .update({ estado: 'aceptada' })
-      .eq('id', invite.id)
-
-    // Add user as member
-    await supabase.from('household_members').insert({
-      household_id: invite.household_id,
-      user_id: user.id,
-    })
-
-    router.push('/inicio')
   }
 
   if (loading) {

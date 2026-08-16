@@ -52,6 +52,19 @@ export interface Expense {
   settled: boolean
 }
 
+export interface Repayment {
+  id: string
+  householdId: string
+  fromId: string
+  toId: string
+  amount: number
+  currency: CurrencyCode
+  date: string
+  note?: string
+  expenseId?: string | null
+  createdById: string
+}
+
 export interface Contribution {
   id: string
   memberId: string
@@ -82,7 +95,7 @@ export interface SavingsMovement {
   note?: string
 }
 
-export type ActivityKind = 'gasto' | 'aporte' | 'ahorro'
+export type ActivityKind = 'gasto' | 'aporte' | 'ahorro' | 'pago'
 
 export interface ActivityItem {
   id: string

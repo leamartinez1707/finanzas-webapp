@@ -2,27 +2,19 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, ReceiptText, Target, PiggyBank, Clock3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-const ITEMS = [
-  { href: '/inicio', label: 'Inicio', icon: LayoutGrid },
-  { href: '/gastos', label: 'Gastos', icon: ReceiptText },
-  { href: '/objetivos', label: 'Objetivos', icon: Target },
-  { href: '/ahorros', label: 'Ahorros', icon: PiggyBank },
-  { href: '/historial', label: 'Historial', icon: Clock3 },
-]
+import { NAV_ITEMS } from '@/components/app-sidebar'
 
 export function BottomNav() {
   const pathname = usePathname()
 
   return (
     <nav
-      className="sticky bottom-0 z-30 border-t border-border bg-card/85 backdrop-blur-lg"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/85 backdrop-blur-lg lg:hidden"
       aria-label="Navegación principal"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)] pt-1.5 md:max-w-xl md:px-8">
-        {ITEMS.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon
           return (

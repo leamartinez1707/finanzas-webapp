@@ -18,7 +18,7 @@ export function ExpenseForm({
   onDelete,
 }: {
   initial?: Expense
-  onSubmit: (data: Omit<Expense, 'id'>) => void
+  onSubmit: (data: Omit<Expense, 'id'>) => void | Promise<void>
   onCancel?: () => void
   onDelete?: () => void
 }) {

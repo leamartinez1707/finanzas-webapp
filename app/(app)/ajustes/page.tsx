@@ -22,6 +22,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { CurrencyCode } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function AjustesPage() {
   const router = useRouter()
@@ -71,19 +72,30 @@ export default function AjustesPage() {
     setEditing(true)
   }
 
-  function handleEdit(e: React.FormEvent) {
+  async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
-    updateHousehold(activeHousehold!.id, {
-      name: editName.trim() || activeHousehold!.name,
-      currency: editCurrency,
-    })
+    try {
+      await updateHousehold(activeHousehold!.id, {
+        name: editName.trim() || activeHousehold!.name,
+        currency: editCurrency,
+      })
+      showSuccess('Hogar actualizado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(false)
   }
 
   async function handleCreateAnother() {
-    const id = await createHousehold('Nuevo hogar', 'UYU')
-    setSelectedContext(id)
-    router.push('/ajustes')
+    try {
+      const id = await createHousehold('Nuevo hogar', 'UYU')
+      setSelectedContext(id)
+      showSuccess('Hogar creado.')
+      router.push('/ajustes')
+    } catch (error) {
+      showError(error)
+    }
   }
 
   return (

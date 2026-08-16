@@ -8,6 +8,7 @@ import { inputClass } from '@/components/field'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { InviteStatus } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 const STATUS_META: Record<
   InviteStatus,
@@ -34,11 +35,34 @@ export function InviteManager({ householdId }: { householdId: string }) {
     const value = email.trim()
     if (!value) return
     setError('')
-    const result = await addInvite(householdId, value)
-    if (result?.error) {
-      setError(result.error)
-    } else {
-      setEmail('')
+    try {
+      const result = await addInvite(householdId, value)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        setEmail('')
+        showSuccess('Invitación enviada.')
+      }
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  async function handleResend(inviteId: string) {
+    try {
+      await updateInvite(householdId, inviteId, 'pendiente')
+      showSuccess('Invitación reenviada.')
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  async function handleRemove(inviteId: string) {
+    try {
+      await removeInvite(householdId, inviteId)
+      showSuccess('Invitación cancelada.')
+    } catch (error) {
+      showError(error)
     }
   }
 
@@ -99,14 +123,14 @@ export function InviteManager({ householdId }: { householdId: string }) {
                   {inv.status !== 'aceptada' && (
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => updateInvite(householdId, inv.id, 'pendiente')}
+                        onClick={() => handleResend(inv.id)}
                         aria-label="Reenviar invitación"
                         className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       >
                         <RotateCw className="size-4" />
                       </button>
                       <button
-                        onClick={() => removeInvite(householdId, inv.id)}
+                        onClick={() => handleRemove(inv.id)}
                         aria-label="Cancelar invitación"
                         className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       >

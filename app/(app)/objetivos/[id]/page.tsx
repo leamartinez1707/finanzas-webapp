@@ -13,6 +13,7 @@ import { goalSaved } from '@/components/goal-card'
 import { formatDate } from '@/lib/format'
 import { GoalForm } from '../goal-form'
 import type { Goal } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function GoalDetailPage() {
   const params = useParams()
@@ -44,28 +45,51 @@ export default function GoalDetailPage() {
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )
 
-  function handleContribute(e: React.FormEvent) {
+  async function handleContribute(e: React.FormEvent) {
     e.preventDefault()
     const value = Number(contribAmount)
     if (!value || value <= 0) return setContribError('Ingresá un monto válido')
-    addContribution(goal!.id, currentUser!.id, value)
+    try {
+      await addContribution(goal!.id, currentUser!.id, value)
+      showSuccess('Aporte registrado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setContributing(false)
     setContribAmount('')
     setContribError('')
   }
 
-  function handleUpdate(data: Omit<Goal, 'id' | 'contributions'>) {
-    updateGoal(goal!.id, data)
+  async function handleUpdate(data: Omit<Goal, 'id' | 'contributions'>) {
+    try {
+      await updateGoal(goal!.id, data)
+      showSuccess('Objetivo actualizado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(false)
   }
 
-  function handleDelete() {
-    deleteGoal(goal!.id)
+  async function handleDelete() {
+    try {
+      await deleteGoal(goal!.id)
+      showSuccess('Objetivo eliminado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     router.push('/objetivos')
   }
 
-  function handleDeleteContribution(id: string) {
-    deleteContribution(id)
+  async function handleDeleteContribution(id: string) {
+    try {
+      await deleteContribution(id)
+      showSuccess('Aporte eliminado.')
+    } catch (error) {
+      showError(error)
+    }
   }
 
   return (

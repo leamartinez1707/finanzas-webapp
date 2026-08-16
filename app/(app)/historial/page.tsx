@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Clock3, ListFilter, X, ReceiptText, Target, PiggyBank } from 'lucide-react'
+import { Clock3, ListFilter, X, ReceiptText, Target, PiggyBank, HandCoins } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { ScreenHeader } from '@/components/screen-header'
@@ -17,6 +17,7 @@ const KIND_LABELS: Record<ActivityKind, { label: string; icon: typeof ReceiptTex
   gasto: { label: 'Gastos', icon: ReceiptText },
   aporte: { label: 'Aportes', icon: Target },
   ahorro: { label: 'Ahorros', icon: PiggyBank },
+  pago: { label: 'Pagos', icon: HandCoins },
 }
 
 export default function HistorialPage() {
@@ -30,6 +31,7 @@ export default function HistorialPage() {
     expenses,
     goals,
     savings,
+    repayments,
   } = useApp()
 
   const [kindFilter, setKindFilter] = useState<ActivityKind | null>(null)
@@ -42,8 +44,8 @@ export default function HistorialPage() {
   }, [isPersonal, currentUser?.id, activeHousehold])
 
   const allActivity = useMemo(
-    () => buildActivity({ expenses, goals, savings, members, baseCurrency: activeCurrency }, scopeFilter),
-    [expenses, goals, savings, members, activeCurrency, scopeFilter],
+    () => buildActivity({ expenses, goals, savings, repayments, members, baseCurrency: activeCurrency }, scopeFilter),
+    [expenses, goals, savings, repayments, members, activeCurrency, scopeFilter],
   )
 
   const filtered = useMemo(() => {
@@ -86,7 +88,7 @@ export default function HistorialPage() {
 
       {/* --- kind filters --- */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {(['gasto', 'aporte', 'ahorro'] as ActivityKind[]).map((kind) => {
+        {(['gasto', 'aporte', 'ahorro', 'pago'] as ActivityKind[]).map((kind) => {
           const active = kindFilter === kind
           const { label, icon: Icon } = KIND_LABELS[kind]
           return (

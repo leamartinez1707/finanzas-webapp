@@ -12,6 +12,7 @@ import { Field, inputClass } from '@/components/field'
 import { formatDate, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { SavingsMovement } from '@/lib/types'
+import { showError, showSuccess } from '@/lib/toast'
 
 export default function AhorrosPage() {
   const {
@@ -72,19 +73,25 @@ export default function AhorrosPage() {
     return movs.reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
   }
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     const value = Number(movAmount)
     if (!value || value <= 0) return setMovError('Ingresá un monto válido')
-    addSavings({
-      memberId: currentUser!.id,
-      scope: isPersonal ? 'personal' : 'household',
-      householdId: isPersonal ? undefined : activeHousehold?.id,
-      type: movType,
-      amount: value,
-      date: new Date().toISOString(),
-      note: movNote.trim() || undefined,
-    })
+    try {
+      await addSavings({
+        memberId: currentUser!.id,
+        scope: isPersonal ? 'personal' : 'household',
+        householdId: isPersonal ? undefined : activeHousehold?.id,
+        type: movType,
+        amount: value,
+        date: new Date().toISOString(),
+        note: movNote.trim() || undefined,
+      })
+      showSuccess('Movimiento registrado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setAdding(false)
     setMovAmount('')
     setMovNote('')
@@ -99,26 +106,38 @@ export default function AhorrosPage() {
     setMovError('')
   }
 
-  function handleUpdate(e: React.FormEvent) {
+  async function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
     if (!editing) return
     const value = Number(movAmount)
     if (!value || value <= 0) return setMovError('Ingresá un monto válido')
-    updateSavings(editing.id, {
-      type: movType,
-      amount: value,
-      date: editing.date,
-      note: movNote.trim() || undefined,
-    })
+    try {
+      await updateSavings(editing.id, {
+        type: movType,
+        amount: value,
+        date: editing.date,
+        note: movNote.trim() || undefined,
+      })
+      showSuccess('Movimiento actualizado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(undefined)
     setMovAmount('')
     setMovNote('')
     setMovError('')
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!editing) return
-    deleteSavings(editing.id)
+    try {
+      await deleteSavings(editing.id)
+      showSuccess('Movimiento eliminado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
     setEditing(undefined)
   }
 
