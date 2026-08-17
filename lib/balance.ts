@@ -17,14 +17,29 @@ export interface Settlement {
   currency: CurrencyCode
 }
 
-export function computeBalances(members: Member[], expenses: Expense[], repayments: Repayment[]) {
+function filterByMonth<T extends { date: string }>(items: T[], month: { year: number; month: number }): T[] {
+  return items.filter((item) => {
+    const d = new Date(item.date)
+    return d.getFullYear() === month.year && d.getMonth() === month.month
+  })
+}
+
+export function computeBalances(
+  members: Member[],
+  expenses: Expense[],
+  repayments: Repayment[],
+  month?: { year: number; month: number },
+) {
+  const filteredExpenses = month ? filterByMonth(expenses, month) : expenses
+  const filteredRepayments = month ? filterByMonth(repayments, month) : repayments
+
   const currencies = new Set<CurrencyCode>()
-  expenses.filter((e) => e.scope === 'household').forEach((e) => currencies.add(e.currency))
-  repayments.forEach((r) => currencies.add(r.currency))
+  filteredExpenses.filter((e) => e.scope === 'household').forEach((e) => currencies.add(e.currency))
+  filteredRepayments.forEach((r) => currencies.add(r.currency))
 
   const balances = [...currencies].flatMap((currency) => members.map((member) => {
-    const currencyExpenses = expenses.filter((e) => e.scope === 'household' && e.currency === currency)
-    const currencyRepayments = repayments.filter((r) => r.currency === currency)
+    const currencyExpenses = filteredExpenses.filter((e) => e.scope === 'household' && e.currency === currency)
+    const currencyRepayments = filteredRepayments.filter((r) => r.currency === currency)
     const paid = currencyExpenses.filter((e) => e.payerId === member.id).reduce((s, e) => s + e.amount, 0)
     const share = currencyExpenses.reduce((s, e) => s + e.amount / Math.max(members.length, 1), 0)
     const outgoing = currencyRepayments.filter((r) => r.fromId === member.id).reduce((s, r) => s + r.amount, 0)

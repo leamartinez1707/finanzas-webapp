@@ -24,6 +24,7 @@ export default function GastosPage() {
     currentUser,
     members,
     expenses,
+    repayments,
     loading,
     addExpense,
     updateExpense,
@@ -226,6 +227,7 @@ export default function GastosPage() {
                       expense={expense}
                       baseCurrency={activeCurrency}
                       members={isPersonal ? 1 : householdMembers.length}
+                      repayments={isPersonal ? undefined : repayments.filter((r) => r.householdId === activeHousehold?.id)}
                       onClick={() => setEditing(expense)}
                     />
                   </li>

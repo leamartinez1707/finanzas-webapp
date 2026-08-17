@@ -22,6 +22,10 @@ export const metadata: Metadata = {
     'Llevá los gastos compartidos de tu hogar, los objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
   generator: 'v0.app',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

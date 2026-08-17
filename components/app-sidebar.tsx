@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bird, Clock3, LayoutGrid, PiggyBank, ReceiptText, Settings2, Target } from 'lucide-react'
+import { Clock3, LayoutGrid, PiggyBank, ReceiptText, Settings2, Target } from 'lucide-react'
+import { Logo } from '@/components/brand'
 import { ContextSwitcher } from '@/components/context-switcher'
 import { useApp } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -21,11 +22,8 @@ export function AppSidebar() {
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/70 px-4 py-5 lg:flex">
-      <div className="flex items-center gap-2 px-2 text-lg font-bold tracking-tight">
-        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Bird className="size-4.5" aria-hidden />
-        </span>
-        Nido
+      <div className="px-2">
+        <Logo showText={false} />
       </div>
 
       <div className="mt-8"><ContextSwitcher /></div>

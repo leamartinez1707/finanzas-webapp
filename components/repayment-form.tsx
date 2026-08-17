@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CurrencySelect } from '@/components/currency-select'
 import { Field, inputClass } from '@/components/field'
 import { PersonAvatar } from '@/components/person-avatar'
+import { Money } from '@/components/money'
 import type { CurrencyCode, Member, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -27,7 +28,14 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
   const [note, setNote] = useState(initial?.note ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [expenseSearch, setExpenseSearch] = useState('')
   const compatibleExpenses = householdExpenses.filter((e) => e.currency === currency)
+
+  const filteredExpenses = useMemo(() => {
+    if (!expenseSearch.trim()) return compatibleExpenses
+    const q = expenseSearch.toLowerCase()
+    return compatibleExpenses.filter((e) => e.description.toLowerCase().includes(q))
+  }, [compatibleExpenses, expenseSearch])
 
   useEffect(() => {
     if (expenseId && !compatibleExpenses.some((expense) => expense.id === expenseId)) {
@@ -61,7 +69,51 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
       <MemberPicker label="Recibe" value={toId} onChange={setToId} members={householdMembers} />
     </div>
     <Field label="Fecha" htmlFor="repayment-date"><input id="repayment-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} /></Field>
-    <Field label="Gasto relacionado" htmlFor="repayment-expense" hint="Opcional"><select id="repayment-expense" value={expenseId} onChange={(e) => setExpenseId(e.target.value)} className={inputClass}><option value="">Pago general</option>{compatibleExpenses.map((e) => <option key={e.id} value={e.id}>{e.description} · {e.currency} {e.amount}</option>)}</select></Field>
+    <div className="space-y-1.5">
+      <label htmlFor="repayment-expense" className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gasto relacionado <span className="normal-case font-normal">(Opcional)</span></label>
+      <input
+        id="repayment-expense"
+        value={expenseSearch}
+        onChange={(e) => setExpenseSearch(e.target.value)}
+        placeholder="Buscar gasto..."
+        className={inputClass}
+      />
+      {expenseId && (
+        <p className="text-xs text-muted-foreground">
+          Seleccionado: <span className="font-medium text-foreground">{compatibleExpenses.find((e) => e.id === expenseId)?.description ?? 'Pago general'}</span>
+          <button type="button" onClick={() => { setExpenseId(''); setExpenseSearch('') }} className="ml-1 text-destructive hover:underline">quitar</button>
+        </p>
+      )}
+      {!expenseId && (
+        <p className="text-xs text-muted-foreground">Por defecto: <span className="font-medium text-foreground">Pago general</span></p>
+      )}
+      {filteredExpenses.length > 0 && (
+        <div className="max-h-40 overflow-y-auto rounded-2xl border border-border bg-card divide-y divide-border">
+          {filteredExpenses.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => {
+                if (expenseId === e.id) {
+                  setExpenseId('')
+                  setExpenseSearch('')
+                } else {
+                  setExpenseId(e.id)
+                  setExpenseSearch(e.description)
+                }
+              }}
+              className={cn(
+                'flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60',
+                expenseId === e.id && 'bg-primary/8',
+              )}
+            >
+              <span className="truncate">{e.description}</span>
+              <Money amount={e.amount} currency={e.currency} className="ml-2 shrink-0 text-xs font-semibold" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
     <Field label="Nota" htmlFor="repayment-note" hint="Opcional"><input id="repayment-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: transferencia" className={inputClass} /></Field>
     {error && <p className="text-sm font-medium text-destructive">{error}</p>}
     <div className="flex gap-2 pt-1">{onCancel && <button type="button" onClick={onCancel} className="flex-1 rounded-2xl border border-border py-3.5 font-semibold">Cancelar</button>}<button type="submit" disabled={submitting} className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Guardando...' : initial ? 'Guardar cambios' : 'Registrar pago'}</button></div>

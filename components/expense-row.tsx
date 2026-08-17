@@ -6,26 +6,44 @@ import { CategoryIcon } from '@/components/category-icon'
 import { Money, CurrencyTag } from '@/components/money'
 import { PersonAvatar } from '@/components/person-avatar'
 import { formatRelative } from '@/lib/format'
-import type { CurrencyCode, Expense } from '@/lib/types'
+import type { CurrencyCode, Expense, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function ExpenseRow({
   expense,
   baseCurrency,
   members,
+  repayments,
   onClick,
 }: {
   expense: Expense
   baseCurrency: CurrencyCode
-  members: number // number of household members for split calculation
+  members: number
+  repayments?: Repayment[]
   onClick?: () => void
 }) {
   const { getMember, currentUserId } = useApp()
   const payer = getMember(expense.payerId)
 
-  // Calculate per-person share
   const share = members > 1 ? Math.round(expense.amount / members) : expense.amount
   const isPayer = expense.payerId === currentUserId
+
+  const expenseDate = new Date(expense.date)
+  const expenseMonth = expenseDate.getMonth()
+  const expenseYear = expenseDate.getFullYear()
+
+  const paidBack = !isPayer && currentUserId
+    ? (repayments ?? [])
+        .filter((r) => {
+          if (r.fromId !== currentUserId || r.toId !== expense.payerId) return false
+          if (r.currency !== expense.currency) return false
+          const rd = new Date(r.date)
+          return rd.getFullYear() === expenseYear && rd.getMonth() === expenseMonth
+        })
+        .reduce((s, r) => s + r.amount, 0)
+    : 0
+
+  const isFullyPaid = paidBack >= share
 
   return (
     <button
@@ -48,8 +66,18 @@ export function ExpenseRow({
         </p>
       </div>
       <div className="flex items-center gap-2">
-        {/* Show per-person share for household expenses */}
-        {expense.scope === 'household' && members > 1 && !isPayer && <span className="rounded-full bg-warning/20 px-2 py-1 text-[10px] font-semibold text-warning-foreground"><Money amount={share} currency={expense.currency} className="tnum" /></span>}
+        {expense.scope === 'household' && members > 1 && !isPayer && paidBack > 0 && (
+          <span className={cn(
+            'rounded-full px-2 py-1 text-[10px] font-semibold',
+            isFullyPaid ? 'bg-positive/20 text-positive' : 'bg-positive/15 text-positive',
+          )}>
+            {isFullyPaid ? (
+              <span className="flex items-center gap-1">✓ Saldado</span>
+            ) : (
+              <Money amount={paidBack} currency={expense.currency} className="tnum" />
+            )}
+          </span>
+        )}
         <Money amount={expense.amount} currency={expense.currency} className="text-base" />
         {expense.scope === 'household' && payer && (
           <PersonAvatar member={payer} size="xs" />
