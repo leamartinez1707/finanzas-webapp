@@ -11,6 +11,7 @@ import {
   Plus,
   AlertTriangle,
   ArrowRight,
+  UserMinus,
 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
@@ -36,12 +37,15 @@ export default function AjustesPage() {
     setSelectedContext,
     updateHousehold,
     createHousehold,
+    leaveHousehold,
+    removeMember,
   } = useApp()
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editCurrency, setEditCurrency] = useState<CurrencyCode>('UYU')
   const [showLeave, setShowLeave] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null)
 
   if (loading) return null
 
@@ -98,6 +102,28 @@ export default function AjustesPage() {
     }
   }
 
+  async function handleLeave() {
+    try {
+      await leaveHousehold(activeHousehold!.id)
+      showSuccess('Saliste del hogar.')
+      setShowLeave(false)
+      router.push('/inicio')
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  async function handleRemoveMember() {
+    if (!memberToRemove) return
+    try {
+      await removeMember(activeHousehold!.id, memberToRemove.id)
+      showSuccess('Se sacó al miembro del hogar.')
+      setMemberToRemove(null)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <ScreenHeader title="Ajustes" subtitle={activeHousehold.name} />
@@ -146,6 +172,15 @@ export default function AjustesPage() {
                 <span className="text-xs text-muted-foreground">
                   Desde {formatDate(m.joinedAt)}
                 </span>
+                {currentUser?.id === activeHousehold.ownerId && !isMe && (
+                  <button
+                    onClick={() => setMemberToRemove({ id: m.id, name: m.name })}
+                    aria-label={`Sacar a ${m.name}`}
+                    className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <UserMinus className="size-4" />
+                  </button>
+                )}
               </li>
             )
           })}
@@ -275,6 +310,12 @@ export default function AjustesPage() {
               <span className="mt-0.5 text-destructive">•</span>
               Podés volver si alguien te invita de nuevo.
             </li>
+            {activeHousehold.memberIds.length === 1 && (
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-destructive">•</span>
+                Sos la única persona en este hogar — nadie va a poder verlo hasta que alguien se una de nuevo.
+              </li>
+            )}
           </ul>
           <div className="flex gap-2 pt-2">
             <button
@@ -284,16 +325,54 @@ export default function AjustesPage() {
               Cancelar
             </button>
             <button
-              onClick={() => {
-                // In a real app this would call leaveHousehold()
-                // For now, just navigate to personal view
-                setSelectedContext('personal')
-                setShowLeave(false)
-                router.push('/inicio')
-              }}
+              onClick={handleLeave}
               className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px"
             >
               Salir del hogar
+            </button>
+          </div>
+        </div>
+      </Sheet>
+
+      {/* --- remove member confirmation sheet --- */}
+      <Sheet
+        open={!!memberToRemove}
+        onClose={() => setMemberToRemove(null)}
+        title="¿Sacar del hogar?"
+      >
+        <div className="space-y-4">
+          <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-destructive/15 text-destructive">
+            <AlertTriangle className="size-6" />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            Si sacás a <strong>{memberToRemove?.name}</strong> de <strong>{activeHousehold.name}</strong>:
+          </p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-destructive">•</span>
+              Sus gastos ya registrados quedan en el historial del hogar.
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-destructive">•</span>
+              Deja de ver movimientos nuevos de este hogar.
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-destructive">•</span>
+              Puede volver si lo invitás de nuevo.
+            </li>
+          </ul>
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setMemberToRemove(null)}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleRemoveMember}
+              className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px"
+            >
+              Sacar del hogar
             </button>
           </div>
         </div>
