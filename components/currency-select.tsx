@@ -10,10 +10,12 @@ export function CurrencySelect({
   value,
   onChange,
   compact,
+  disabled,
 }: {
   value: CurrencyCode
   onChange: (c: CurrencyCode) => void
   compact?: boolean
+  disabled?: boolean
 }) {
   return (
     <div className={cn('flex gap-2', compact ? 'flex-wrap justify-center' : 'grid grid-cols-2')}>
@@ -23,13 +25,18 @@ export function CurrencySelect({
           <button
             key={c}
             type="button"
-            onClick={() => onChange(c)}
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return
+              onChange(c)
+            }}
             className={cn(
               'rounded-full border text-left transition-colors',
               compact
                 ? 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs'
                 : 'flex items-center gap-2.5 rounded-2xl p-3',
               selected ? 'border-primary bg-primary/8' : 'border-border hover:bg-muted/50',
+              disabled && 'cursor-not-allowed opacity-50',
             )}
           >
             <span

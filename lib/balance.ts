@@ -50,6 +50,16 @@ export function computeBalances(
   return { balances, currencies: [...currencies] }
 }
 
+export function sumByCurrency<T extends { amount: number; currency: CurrencyCode }>(
+  items: T[],
+): Partial<Record<CurrencyCode, number>> {
+  const result: Partial<Record<CurrencyCode, number>> = {}
+  for (const item of items) {
+    result[item.currency] = (result[item.currency] ?? 0) + item.amount
+  }
+  return result
+}
+
 // Greedy settlement: minimize transfers
 export function computeSettlements(balances: MemberBalance[], currency: CurrencyCode): Settlement[] {
   const currencyBalances = balances.filter((b) => b.currency === currency)

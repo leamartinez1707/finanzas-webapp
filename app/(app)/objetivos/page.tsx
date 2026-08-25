@@ -7,9 +7,11 @@ import { ScreenHeader } from '@/components/screen-header'
 import { GoalCard, goalSaved } from '@/components/goal-card'
 import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
+import { Money } from '@/components/money'
 import { GoalForm } from './goal-form'
+import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
-import type { Goal } from '@/lib/types'
+import type { CurrencyCode, Goal } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
 export default function ObjetivosPage() {
@@ -55,9 +57,18 @@ export default function ObjetivosPage() {
     setAdding(false)
   }
 
-  const totalTarget = scopedGoals.reduce((s, g) => s + g.target, 0)
-  const totalSaved = scopedGoals.reduce((s, g) => s + goalSaved(g), 0)
-  const overallPct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0
+  const targetsByCurrency = useMemo(
+    () => sumByCurrency(scopedGoals.map((g) => ({ amount: g.target, currency: g.currency }))),
+    [scopedGoals],
+  )
+  const savedByCurrency = useMemo(
+    () => sumByCurrency(scopedGoals.map((g) => ({ amount: goalSaved(g), currency: g.currency }))),
+    [scopedGoals],
+  )
+  const goalCurrencies = useMemo(
+    () => [...new Set(scopedGoals.map((g) => g.currency))],
+    [scopedGoals],
+  )
 
   if (loading || !currentUser) return null
 
@@ -83,24 +94,40 @@ export default function ObjetivosPage() {
         }
       />
 
-      {/* --- overall progress --- */}
-      {scopedGoals.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Progreso total</span>
-            <span className="text-sm font-bold tabular-nums">{overallPct}%</span>
-          </div>
-          <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${overallPct}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {filter === 'activos' ? 'Faltan ' : ''}
-            {filter === 'cumplidos' ? 'Completaron ' : ''}
-            ${(totalTarget - totalSaved).toLocaleString('es-UY')} para llegar a las metas
-          </p>
+      {/* --- overall progress (per currency) --- */}
+      {goalCurrencies.length > 0 && (
+        <div className="space-y-3">
+          {goalCurrencies.map((currency) => {
+            const target = targetsByCurrency[currency] ?? 0
+            const saved = savedByCurrency[currency] ?? 0
+            const pct = target > 0 ? Math.round((saved / target) * 100) : 0
+            return (
+              <div key={currency} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Progreso total · {currency}
+                  </span>
+                  <span className="text-sm font-bold tabular-nums">{Math.min(100, pct)}%</span>
+                </div>
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {filter === 'activos' ? 'Faltan ' : ''}
+                  {filter === 'cumplidos' ? 'Completaron ' : ''}
+                  <Money
+                    amount={Math.max(0, target - saved)}
+                    currency={currency as CurrencyCode}
+                    className="text-xs font-semibold text-foreground"
+                  />{' '}
+                  para llegar a las metas
+                </p>
+              </div>
+            )
+          })}
         </div>
       )}
 
