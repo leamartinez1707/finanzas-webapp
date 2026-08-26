@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { getSpanishErrorMessage } from '@/lib/error-message'
 import { showSuccess } from '@/lib/toast'
+import { safeRedirect } from '@/lib/safe-redirect'
 
 export default function LoginPage() {
   return (
@@ -49,16 +50,16 @@ function LoginForm() {
       const { error: err } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${location.origin}/auth/callback?next=${redirect || '/onboarding'}` },
+        options: { emailRedirectTo: `${location.origin}/auth/callback?next=${safeRedirect(redirect, '/onboarding')}` },
       })
         if (err) return setError(getSpanishErrorMessage(err))
-       window.location.href = redirect || '/onboarding'
+       window.location.href = safeRedirect(redirect, '/onboarding')
       return
     }
 
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) return setError(getSpanishErrorMessage(err))
-      window.location.href = redirect || '/inicio'
+      window.location.href = safeRedirect(redirect, '/inicio')
   }
 
   return (

@@ -21,7 +21,7 @@ export interface Member {
   joinedAt: string // ISO date
 }
 
-export type InviteStatus = 'pendiente' | 'aceptada' | 'expirada'
+export type InviteStatus = 'pendiente' | 'aceptada' | 'rechazada' | 'expirada'
 
 export interface Invite {
   id: string
@@ -36,6 +36,7 @@ export interface Household {
   currency: CurrencyCode
   memberIds: string[]
   invites: Invite[]
+  ownerId?: string
 }
 
 export interface Expense {
@@ -49,7 +50,6 @@ export interface Expense {
   amount: number
   currency: CurrencyCode
   date: string // ISO date
-  settled: boolean
 }
 
 export interface Repayment {

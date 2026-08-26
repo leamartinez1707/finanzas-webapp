@@ -15,7 +15,6 @@ function toExpense(row: any): Expense {
     amount: Number(row.monto),
     currency: row.moneda as CurrencyCode,
     date: row.fecha,
-    settled: row.settled ?? false,
   }
 }
 
@@ -64,6 +63,7 @@ function toHousehold(row: any): Household {
       status: i.estado,
       sentAt: i.creado_en,
     })),
+    ownerId: row.creado_por ?? undefined,
   }
 }
 
@@ -108,12 +108,13 @@ export async function getCurrentUser(): Promise<Member | null> {
   const { data: { user } } = await s.auth.getUser()
   if (!user) return null
 
-  const { data: profile } = await s
+  const { data: profile, error } = await s
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
+  if (error) throw error
   if (!profile) return null
   const member = toMember(profile)
   member.email = user.email ?? ''
@@ -138,35 +139,41 @@ export async function getMyHouseholds(userId: string): Promise<Household[]> {
   const s = supabase()
 
   // Get household IDs where user is an active member
-  const { data: memberships } = await s
+  const { data: memberships, error: membershipsError } = await s
     .from('household_members')
     .select('household_id')
     .eq('user_id', userId)
     .eq('activo', true)
 
+  if (membershipsError) throw membershipsError
   if (!memberships?.length) return []
 
   const ids = memberships.map((m) => m.household_id)
 
   // Get households with their members and invites
-  const { data: rows } = await s
+  const { data: rows, error: rowsError } = await s
     .from('households')
     .select('*')
     .in('id', ids)
 
+  if (rowsError) throw rowsError
   if (!rows) return []
 
   // Get members for all these households
-  const { data: allMembers } = await s
+  const { data: allMembers, error: allMembersError } = await s
     .from('household_members')
     .select('*')
     .in('household_id', ids)
 
+  if (allMembersError) throw allMembersError
+
   // Get invites for all these households
-  const { data: allInvites } = await s
+  const { data: allInvites, error: allInvitesError } = await s
     .from('household_invites')
     .select('*')
     .in('household_id', ids)
+
+  if (allInvitesError) throw allInvitesError
 
   return rows.map((h) => ({
     ...toHousehold(h),
@@ -182,32 +189,6 @@ export async function getMyHouseholds(userId: string): Promise<Household[]> {
         sentAt: i.creado_en,
       })),
   }))
-}
-
-export async function getHouseholdMembers(householdId: string): Promise<Member[]> {
-  const s = supabase()
-
-  const { data: memberships } = await s
-    .from('household_members')
-    .select('user_id')
-    .eq('household_id', householdId)
-
-  if (!memberships?.length) return []
-
-  const ids = memberships.map((m) => m.user_id)
-
-  // Get profiles
-  const { data: profiles } = await s
-    .from('profiles')
-    .select('*')
-    .in('id', ids)
-
-  // Get auth users for emails (profiles don't store email)
-  const { data: { users } } = await s.auth.admin.listUsers()
-  // Note: listUsers requires service_role — for client, we skip emails
-  // We need to store email in profiles or use a different approach
-
-  return (profiles ?? []).map((p) => toMember(p))
 }
 
 export async function createHousehold(name: string, currency: CurrencyCode): Promise<string> {
@@ -247,6 +228,28 @@ export async function updateHousehold(id: string, patch: Partial<Household>) {
     .eq('id', id)
 }
 
+export async function leaveHousehold(householdId: string) {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await s
+    .from('household_members')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
+export async function removeMember(householdId: string, memberId: string) {
+  const s = supabase()
+  const { error } = await s
+    .from('household_members')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('user_id', memberId)
+  if (error) throw error
+}
+
 // ─── Expenses ───────────────────────────────────────────────────────
 
 export type ExpenseFilter =
@@ -263,7 +266,8 @@ export async function getExpenses(filter: ExpenseFilter): Promise<Expense[]> {
     query = query.eq('scope', 'household').eq('household_id', filter.householdId)
   }
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) throw error
   return (data ?? []).map(toExpense)
 }
 
@@ -391,12 +395,6 @@ export async function deleteRepayment(id: string) {
   if (!data?.length) throw new Error('Repayment not found or not accessible')
 }
 
-export async function toggleSettled(id: string, settled: boolean) {
-  const s = supabase()
-  const { error } = await s.from('expenses').update({ settled }).eq('id', id)
-  if (error) throw error
-}
-
 // ─── Goals ──────────────────────────────────────────────────────────
 
 export async function getGoals(filter: ExpenseFilter): Promise<Goal[]> {
@@ -409,16 +407,19 @@ export async function getGoals(filter: ExpenseFilter): Promise<Goal[]> {
     query = query.eq('scope', 'household').eq('household_id', filter.householdId)
   }
 
-  const { data: goals } = await query
+  const { data: goals, error: goalsError } = await query
+  if (goalsError) throw goalsError
   if (!goals?.length) return []
 
   // Get contributions for all these goals
   const goalIds = goals.map((g) => g.id)
-  const { data: allContributions } = await s
+  const { data: allContributions, error: contributionsError } = await s
     .from('goal_contributions')
     .select('*')
     .in('goal_id', goalIds)
     .order('fecha', { ascending: false })
+
+  if (contributionsError) throw contributionsError
 
   return goals.map((g) =>
     toGoal(g, (allContributions ?? []).filter((c) => c.goal_id === g.id)),
@@ -465,14 +466,15 @@ export async function deleteGoal(id: string) {
   if (error) throw error
 }
 
-export async function addContribution(goalId: string, userId: string, amount: number) {
+export async function addContribution(goalId: string, userId: string, amount: number): Promise<Contribution> {
   const s = supabase()
-  const { error } = await s.from('goal_contributions').insert({
+  const { data, error } = await s.from('goal_contributions').insert({
     goal_id: goalId,
     user_id: userId,
     monto: amount,
-  })
+  }).select('*').single()
   if (error) throw error
+  return toContribution(data)
 }
 
 export async function deleteContribution(id: string) {
@@ -499,13 +501,14 @@ export async function getSavings(
       .in('user_id', memberIds)
   }
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) throw error
   return (data ?? []).map(toSavings)
 }
 
-export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
+export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>): Promise<SavingsMovement> {
   const s = supabase()
-  const { error } = await s.from('savings_movements').insert({
+  const { data, error } = await s.from('savings_movements').insert({
     user_id: m.memberId,
     scope: m.scope,
     household_id: m.householdId ?? null,
@@ -513,8 +516,9 @@ export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>) {
     monto: m.amount,
     fecha: m.date,
     nota: m.note ?? null,
-  })
+  }).select('*').single()
   if (error) throw error
+  return toSavings(data)
 }
 
 export async function updateSavingsMovement(id: string, patch: Partial<SavingsMovement>) {
@@ -554,7 +558,7 @@ export async function addInvite(householdId: string, email: string): Promise<{ t
   if (!user) throw new Error('Not authenticated')
 
   // Check for existing pending invite to this email in this household
-  const { data: existing } = await s
+  const { data: existing, error: existingError } = await s
     .from('household_invites')
     .select('id, token, estado')
     .eq('household_id', householdId)
@@ -562,16 +566,19 @@ export async function addInvite(householdId: string, email: string): Promise<{ t
     .order('creado_en', { ascending: false })
     .limit(1)
 
+  if (existingError) throw existingError
   if (existing?.length && existing[0].estado === 'pendiente') {
     return { error: 'Ya hay una invitación pendiente para este email. Usá reenviar.' }
   }
 
   // Get inviter name
-  const { data: profile } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  const { data: profile, error: profileError } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  if (profileError) throw profileError
   const inviterName = profile?.nombre ?? 'Alguien'
 
   // Get household name
-  const { data: hh } = await s.from('households').select('nombre').eq('id', householdId).single()
+  const { data: hh, error: hhError } = await s.from('households').select('nombre').eq('id', householdId).single()
+  if (hhError) throw hhError
   const householdName = hh?.nombre ?? 'un hogar'
 
   // Insert invite
@@ -604,21 +611,29 @@ export async function resendInvite(inviteId: string) {
   if (!user) throw new Error('Not authenticated')
 
   // Get invite details
-  const { data: invite } = await s
+  const { data: invite, error: inviteError } = await s
     .from('household_invites')
     .select('*, household:households(nombre)')
     .eq('id', inviteId)
     .single()
 
+  if (inviteError) throw inviteError
   if (!invite) throw new Error('Invite not found')
 
   // Get inviter name
-  const { data: profile } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  const { data: profile, error: profileError } = await s.from('profiles').select('nombre').eq('id', user.id).single()
+  if (profileError) throw profileError
   const inviterName = profile?.nombre ?? 'Alguien'
 
   const householdName = (invite.household as any)?.nombre ?? 'un hogar'
 
   await sendInviteEmail(invite.email_invitado, householdName, invite.token, inviterName)
+
+  const { error } = await s
+    .from('household_invites')
+    .update({ expira_en: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+    .eq('id', inviteId)
+  if (error) throw error
 }
 
 export async function updateInvite(householdId: string, inviteId: string, status: string) {
@@ -659,6 +674,7 @@ export async function getMyPendingInvites(): Promise<any[]> {
 export async function getAllMembers(userIds: string[]): Promise<Member[]> {
   if (!userIds.length) return []
   const s = supabase()
-  const { data } = await s.from('profiles').select('*').in('id', userIds)
+  const { data, error } = await s.from('profiles').select('*').in('id', userIds)
+  if (error) throw error
   return (data ?? []).map(toMember)
 }

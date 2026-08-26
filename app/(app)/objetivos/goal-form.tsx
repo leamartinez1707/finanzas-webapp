@@ -23,6 +23,8 @@ export function GoalForm({
   const [deadline, setDeadline] = useState(initial?.deadline ?? '')
   const [error, setError] = useState('')
 
+  const currencyLocked = !!initial && initial.contributions.length > 0
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const value = Number(target)
@@ -72,7 +74,12 @@ export function GoalForm({
       </Field>
 
       <Field label="Moneda">
-        <CurrencySelect value={currency} onChange={setCurrency} />
+        <CurrencySelect value={currency} onChange={setCurrency} disabled={currencyLocked} />
+        {currencyLocked && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            No podés cambiar la moneda de un objetivo que ya tiene aportes.
+          </p>
+        )}
       </Field>
 
       <Field label="Fecha límite (opcional)" htmlFor="goal-deadline">

@@ -34,12 +34,13 @@ import {
   deleteSavingsMovement as deleteSavingsMovementDB,
   createHousehold as createHouseholdDB,
   updateHousehold as updateHouseholdDB,
+  leaveHousehold as leaveHouseholdDB,
+  removeMember as removeMemberDB,
   addInvite as addInviteDB,
   resendInvite as resendInviteDB,
   updateInvite as updateInviteDB,
   removeInvite as removeInviteDB,
   upsertProfile,
-  getHouseholdMembers,
   type ExpenseFilter,
 } from './supabase/queries'
 import { showError } from './toast'
@@ -85,6 +86,8 @@ interface AppState {
   updateInvite: (householdId: string, inviteId: string, status: string) => Promise<void>
   removeInvite: (householdId: string, inviteId: string) => Promise<void>
   updateHousehold: (id: string, patch: Partial<Household>) => Promise<void>
+  leaveHousehold: (householdId: string) => Promise<void>
+  removeMember: (householdId: string, memberId: string) => Promise<void>
   updateProfile: (name: string, color: string) => Promise<void>
 
   refresh: () => Promise<void>
@@ -245,22 +248,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRepayments((prev) => prev.filter((r) => r.id !== id))
       }),
       addContribution: wrapBusy(async (goalId, memberId, amount) => {
-        await addContributionDB(goalId, memberId, amount)
+        const created = await addContributionDB(goalId, memberId, amount)
         setGoals((prev) =>
           prev.map((g) =>
             g.id === goalId
-              ? {
-                  ...g,
-                  contributions: [
-                    {
-                      id: crypto.randomUUID(),
-                      memberId,
-                      amount,
-                      date: new Date().toISOString(),
-                    },
-                    ...g.contributions,
-                  ],
-                }
+              ? { ...g, contributions: [created, ...g.contributions] }
               : g,
           ),
         )
@@ -289,11 +281,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setGoals((prev) => prev.filter((g) => g.id !== id))
       }),
       addSavings: wrapBusy(async (m) => {
-        await addSavingsMovementDB(m)
-        setSavings((prev) => [
-          { ...m, id: crypto.randomUUID() },
-          ...prev,
-        ])
+        const created = await addSavingsMovementDB(m)
+        setSavings((prev) => [created, ...prev])
       }),
       updateSavings: wrapBusy(async (id, patch) => {
         await updateSavingsMovementDB(id, patch)
@@ -343,6 +332,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await updateHouseholdDB(id, patch)
         setHouseholds((prev) =>
           prev.map((h) => (h.id === id ? { ...h, ...patch } : h)),
+        )
+      }),
+      leaveHousehold: wrapBusy(async (householdId) => {
+        await leaveHouseholdDB(householdId)
+        setHouseholds((prev) => prev.filter((h) => h.id !== householdId))
+        if (selectedContext === householdId) {
+          setSelectedContext('personal')
+        }
+      }),
+      removeMember: wrapBusy(async (householdId, memberId) => {
+        await removeMemberDB(householdId, memberId)
+        setHouseholds((prev) =>
+          prev.map((h) =>
+            h.id === householdId
+              ? { ...h, memberIds: h.memberIds.filter((id) => id !== memberId) }
+              : h,
+          ),
         )
       }),
       updateProfile: wrapBusy(async (name, color) => {

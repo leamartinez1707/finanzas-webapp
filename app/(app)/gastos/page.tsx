@@ -12,8 +12,9 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
 import { monthKey, monthLabel } from '@/lib/format'
+import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
-import type { CategoryId, Expense } from '@/lib/types'
+import type { CategoryId, CurrencyCode, Expense } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
 export default function GastosPage() {
@@ -58,6 +59,8 @@ export default function GastosPage() {
 
     return [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [expenses, isPersonal, currentUser?.id, activeHousehold, openCategory, openPayer])
+
+  const totalsByCurrency = useMemo(() => sumByCurrency(scopedExpenses), [scopedExpenses])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Expense[]>()
@@ -205,11 +208,16 @@ export default function GastosPage() {
           {scopedExpenses.length} gasto{scopedExpenses.length !== 1 && 's'}
           {hasFilters && ' filtrados'}
         </span>
-        <Money
-          amount={scopedExpenses.reduce((s, e) => s + e.amount, 0)}
-          currency={activeCurrency}
-          className="text-lg font-semibold tnum"
-        />
+        <div className="flex flex-col items-end gap-0.5">
+          {Object.entries(totalsByCurrency).map(([currency, amount]) => (
+            <Money
+              key={currency}
+              amount={amount}
+              currency={currency as CurrencyCode}
+              className="text-lg font-semibold tnum"
+            />
+          ))}
+        </div>
       </div>
 
       {/* --- list --- */}

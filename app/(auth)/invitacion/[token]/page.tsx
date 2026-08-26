@@ -8,6 +8,15 @@ import { PersonAvatar, AvatarStack } from '@/components/person-avatar'
 import { useApp } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { showError, showSuccess } from '@/lib/toast'
+import type { PersonColor } from '@/lib/types'
+
+interface InvitePreview {
+  id: string
+  household_id: string
+  estado: string
+  expira_en: string
+  email_invitado: string
+}
 
 export default function InvitacionPage({
   params,
@@ -21,9 +30,9 @@ export default function InvitacionPage({
   const [loading, setLoading] = useState(true)
   const [expired, setExpired] = useState(false)
   const [rejected, setRejected] = useState(false)
-  const [invite, setInvite] = useState<any>(null)
-  const [household, setHousehold] = useState<any>(null)
-  const [inviter, setInviter] = useState<any>(null)
+  const [invite, setInvite] = useState<InvitePreview | null>(null)
+  const [household, setHousehold] = useState<{ nombre: string } | null>(null)
+  const [inviter, setInviter] = useState<{ nombre: string; color: PersonColor } | null>(null)
   const [householdMembers, setHouseholdMembers] = useState<any[]>([])
   const [needsAuth, setNeedsAuth] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -35,23 +44,34 @@ export default function InvitacionPage({
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (sessionError) throw sessionError
 
-        // Look up the invite by token
-        const { data: inv, error: inviteError } = await supabase
-          .from('household_invites')
-          .select('*, household:households(*)')
-          .eq('token', token)
-          .single()
-        if (inviteError) throw inviteError
+        // Look up the invite preview by token (RPC — works for anonymous visitors)
+        const { data, error: rpcError } = await supabase.rpc('get_invite_preview', { p_token: token })
+        if (rpcError) throw rpcError
 
-        if (!inv) {
+        const row = data?.[0]
+        if (!row) {
           setExpired(true)
           return
         }
 
+        const inv: InvitePreview = {
+          id: row.invite_id,
+          household_id: row.household_id,
+          estado: row.estado,
+          expira_en: row.expira_en,
+          email_invitado: row.email_invitado,
+        }
+
         if (inv.estado === 'expirada' || new Date(inv.expira_en) < new Date()) {
           if (inv.estado !== 'expirada') {
-            const { error } = await supabase.from('household_invites').update({ estado: 'expirada' }).eq('id', inv.id)
-            if (error) throw error
+            // Best-effort status flip: RLS may reject this for an anonymous or
+            // not-yet-a-member visitor. The UI already treats it as expired
+            // based on the timestamp regardless of whether this write succeeds.
+            try {
+              await supabase.from('household_invites').update({ estado: 'expirada' }).eq('id', inv.id)
+            } catch {
+              // Ignore — see comment above.
+            }
           }
           setExpired(true)
           return
@@ -64,35 +84,9 @@ export default function InvitacionPage({
         }
 
         setInvite(inv)
-        setHousehold(inv.household)
-
-        // Get inviter profile
-        if (inv.invitado_por) {
-          const { data: prof, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', inv.invitado_por)
-            .single()
-          if (error) throw error
-          setInviter(prof)
-        }
-
-        // Get members of the household
-        const { data: memberships, error: membershipsError } = await supabase
-          .from('household_members')
-          .select('user_id')
-          .eq('household_id', inv.household_id)
-        if (membershipsError) throw membershipsError
-
-        if (memberships) {
-          const ids = memberships.map((m) => m.user_id)
-          const { data: profiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('id', ids)
-          if (profilesError) throw profilesError
-          setHouseholdMembers(profiles ?? [])
-        }
+        setHousehold({ nombre: row.household_name })
+        setInviter(row.inviter_name ? { nombre: row.inviter_name, color: row.inviter_color as PersonColor } : null)
+        setHouseholdMembers(row.members ?? [])
 
         // Use the session we already checked at the top
         setNeedsAuth(!session?.user)
@@ -139,27 +133,29 @@ export default function InvitacionPage({
         return
       }
 
-      // Accept the invite
+      if (user.email?.toLowerCase() !== invite.email_invitado.toLowerCase()) {
+        showError(new Error('Esta invitación fue enviada a otro email.'))
+        return
+      }
+
+      // Add user as member first — the RLS insert policy requires the invite
+      // to still be 'pendiente', so this must happen before flipping status.
+      const { error: memberError } = await supabase.from('household_members').insert({
+        household_id: invite.household_id,
+        user_id: user.id,
+      })
+      if (memberError) {
+        showError(memberError)
+        return
+      }
+
+      // Now mark the invite as accepted
       const { error: inviteError } = await supabase
         .from('household_invites')
         .update({ estado: 'aceptada' })
         .eq('id', invite.id)
       if (inviteError) {
         showError(inviteError)
-        return
-      }
-
-      // Add user as member
-      const { error: memberError } = await supabase.from('household_members').insert({
-        household_id: invite.household_id,
-        user_id: user.id,
-      })
-      if (memberError) {
-        await supabase
-          .from('household_invites')
-          .update({ estado: 'pendiente' })
-          .eq('id', invite.id)
-        showError(memberError)
         return
       }
 
@@ -170,12 +166,22 @@ export default function InvitacionPage({
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+  async function handleReject() {
+    if (!invite) return
+
+    try {
+      const { error } = await supabase
+        .from('household_invites')
+        .update({ estado: 'rechazada' })
+        .eq('id', invite.id)
+      if (error) {
+        showError(error)
+        return
+      }
+      setRejected(true)
+    } catch (error) {
+      showError(error)
+    }
   }
 
   if (expired) {
@@ -271,7 +277,7 @@ export default function InvitacionPage({
               Aceptar y unirme
             </button>
             <button
-              onClick={() => setRejected(true)}
+              onClick={handleReject}
               className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-base font-semibold text-muted-foreground transition-colors hover:bg-muted"
             >
               <X className="size-5" />

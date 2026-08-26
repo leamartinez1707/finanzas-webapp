@@ -16,6 +16,7 @@ const STATUS_META: Record<
 > = {
   pendiente: { label: 'Pendiente', icon: Clock, className: 'bg-warning/20 text-warning-foreground' },
   aceptada: { label: 'Aceptada', icon: CircleCheck, className: 'bg-primary/12 text-primary' },
+  rechazada: { label: 'Rechazada', icon: X, className: 'bg-destructive/12 text-destructive' },
   expirada: { label: 'Expirada', icon: TriangleAlert, className: 'bg-destructive/12 text-destructive' },
 }
 

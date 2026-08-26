@@ -12,7 +12,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) {
         showError(error)
         router.replace('/')
@@ -20,9 +20,27 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       if (!session) {
         router.replace('/')
-      } else {
-        setReady(true)
+        return
       }
+
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (profileError) {
+        showError(profileError)
+        router.replace('/')
+        return
+      }
+
+      if (!data) {
+        router.replace('/onboarding')
+        return
+      }
+
+      setReady(true)
     }).catch((error) => {
       showError(error)
       router.replace('/')
