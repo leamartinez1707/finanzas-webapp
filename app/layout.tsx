@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   generator: 'v0.app',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon.svg',
+    icon: '/icon.ico',
     apple: '/apple-icon.png',
   },
   appleWebApp: {
