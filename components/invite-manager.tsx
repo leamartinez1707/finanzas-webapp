@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import { Mail, Send, RotateCw, X, Clock, CircleCheck, TriangleAlert } from 'lucide-react'
 import { useApp } from '@/lib/store'
-import { PersonAvatar } from '@/components/person-avatar'
 import { inputClass } from '@/components/field'
-import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { InviteStatus } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
@@ -21,15 +19,11 @@ const STATUS_META: Record<
 }
 
 export function InviteManager({ householdId }: { householdId: string }) {
-  const { getHousehold, members, addInvite, updateInvite, removeInvite } = useApp()
+  const { getHousehold, addInvite, updateInvite, removeInvite } = useApp()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const household = getHousehold(householdId)
   if (!household) return null
-
-  const householdMembers = household.memberIds
-    .map((id) => members.find((m) => m.id === id)!)
-    .filter(Boolean)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -145,29 +139,6 @@ export function InviteManager({ householdId }: { householdId: string }) {
           </ul>
         </div>
       )}
-
-      <div>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Miembros ({householdMembers.length})
-        </h3>
-        <ul className="space-y-2">
-          {householdMembers.map((m) => (
-            <li
-              key={m.id}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3"
-            >
-              <PersonAvatar member={m} size="md" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{m.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{m.email}</p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                Desde {formatDate(m.joinedAt)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   )
 }

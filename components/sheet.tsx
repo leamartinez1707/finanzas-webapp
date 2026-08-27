@@ -46,7 +46,7 @@ export function Sheet({
         aria-modal="true"
         className={cn(
           'relative z-10 flex w-full max-w-md flex-col rounded-t-2xl bg-card shadow-2xl animate-in slide-in-from-bottom duration-300',
-          'sm:max-h-[85vh] sm:rounded-2xl',
+          'max-h-[85dvh] sm:rounded-2xl',
           className,
         )}
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
@@ -69,7 +69,7 @@ export function Sheet({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto px-4 pb-4">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-4 pb-4">{children}</div>
       </div>
     </div>
   )

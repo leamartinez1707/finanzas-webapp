@@ -26,6 +26,7 @@ export default function InvitacionPage({
   const { token } = use(params)
   const router = useRouter()
   const supabase = createClient()
+  const { refresh, setSelectedContext } = useApp()
 
   const [loading, setLoading] = useState(true)
   const [expired, setExpired] = useState(false)
@@ -129,7 +130,7 @@ export default function InvitacionPage({
 
       if (!user) {
         // Redirect to register, then come back here
-        router.push(`/?redirect=/invitacion/${token}`)
+        router.push(`/ingresar?redirect=/invitacion/${token}`)
         return
       }
 
@@ -160,6 +161,13 @@ export default function InvitacionPage({
       }
 
       showSuccess('Te sumaste al hogar.')
+      setSelectedContext(invite.household_id)
+      try {
+        await refresh()
+      } catch {
+        // Non-fatal — the join itself already succeeded. Worst case,
+        // /inicio shows slightly stale data until the next load.
+      }
       router.push('/inicio')
     } catch (error) {
       showError(error)
@@ -253,7 +261,7 @@ export default function InvitacionPage({
         {needsAuth ? (
           <>
             <button
-              onClick={() => router.push(`/?redirect=/invitacion/${token}`)}
+              onClick={() => router.push(`/ingresar?redirect=/invitacion/${token}`)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
             >
               <Check className="size-5" />

@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Clock3, LayoutGrid, PiggyBank, ReceiptText, Settings2, Target } from 'lucide-react'
+import { Clock3, LayoutGrid, LogOut, PiggyBank, ReceiptText, Settings2, Target } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { ContextSwitcher } from '@/components/context-switcher'
 import { useApp } from '@/lib/store'
+import { signOut } from '@/lib/supabase/queries'
+import { showError } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export const NAV_ITEMS = [
@@ -26,8 +28,7 @@ export function AppSidebar() {
         <Logo showText={false} />
       </div>
 
-      <div className="mt-8"><ContextSwitcher /></div>
-
+      <div className="mt-8 md:mt-0"><ContextSwitcher /></div>
       <nav className="mt-8 flex-1" aria-label="Navegación principal">
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Finanzas
@@ -46,7 +47,7 @@ export function AppSidebar() {
                     active ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                   )}
                 >
-                  <Icon className="size-[18px]" strokeWidth={active ? 2.5 : 2} aria-hidden />
+                  <Icon className="size-4.5" strokeWidth={active ? 2.5 : 2} aria-hidden />
                   {item.label}
                 </Link>
               </li>
@@ -68,6 +69,15 @@ export function AppSidebar() {
           Ajustes del hogar
         </Link>
       )}
+
+      <button
+        type="button"
+        onClick={() => signOut().catch(showError)}
+        className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+      >
+        <LogOut className="size-[18px]" aria-hidden />
+        Cerrar sesión
+      </button>
     </aside>
   )
 }
