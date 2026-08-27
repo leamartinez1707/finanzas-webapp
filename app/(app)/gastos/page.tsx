@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, ListFilter, X, ReceiptText } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
@@ -39,6 +40,17 @@ export default function GastosPage() {
   // --- add / edit sheet ---
   const [editing, setEditing] = useState<Expense | undefined>(undefined)
   const [adding, setAdding] = useState(false)
+
+  // Coming from a "Nuevo gasto" link elsewhere (e.g. Inicio) — open the
+  // sheet straight away instead of making the user click + again.
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') {
+      setAdding(true)
+      router.replace('/gastos', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // --- resolve members for payer filter (household only) ---
   const householdMembers = useMemo(() => {

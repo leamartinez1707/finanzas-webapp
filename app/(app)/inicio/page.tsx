@@ -16,7 +16,7 @@ import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
 import { PERSON_COLORS } from '@/lib/categories'
-import { createClient } from '@/lib/supabase/client'
+import { signOut } from '@/lib/supabase/queries'
 import { cn } from '@/lib/utils'
 import type { PersonColor } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
@@ -33,12 +33,15 @@ export default function InicioPage() {
     goals,
     savings,
     repayments,
+    myHouseholds,
     updateProfile,
+    setDefaultContext,
   } = useApp()
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileName, setProfileName] = useState('')
   const [profileColor, setProfileColor] = useState<PersonColor>('person-1')
+  const [profileDefaultContext, setProfileDefaultContext] = useState('personal')
   const [pendingInvites, setPendingInvites] = useState<any[]>([])
 
   useEffect(() => {
@@ -53,6 +56,7 @@ export default function InicioPage() {
     if (!currentUser) return
     setProfileName(currentUser.name)
     setProfileColor(currentUser.color)
+    setProfileDefaultContext(currentUser.defaultContext ?? 'personal')
     setProfileOpen(true)
   }
 
@@ -60,6 +64,7 @@ export default function InicioPage() {
     e.preventDefault()
     try {
       await updateProfile(profileName.trim() || 'Yo', profileColor)
+      await setDefaultContext(profileDefaultContext)
       showSuccess('Perfil actualizado.')
       setProfileOpen(false)
     } catch (error) {
@@ -67,12 +72,9 @@ export default function InicioPage() {
     }
   }
 
-  async function signOut() {
+  async function handleSignOut() {
     try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      window.location.href = '/'
+      await signOut()
     } catch (error) {
       showError(error)
     }
@@ -267,6 +269,22 @@ export default function InicioPage() {
             </div>
           </Field>
 
+          <Field label="Contexto por defecto al abrir la app" htmlFor="profile-default-context">
+            <select
+              id="profile-default-context"
+              value={profileDefaultContext}
+              onChange={(e) => setProfileDefaultContext(e.target.value)}
+              className={inputClass}
+            >
+              <option value="personal">Mis finanzas</option>
+              {myHouseholds.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -286,7 +304,7 @@ export default function InicioPage() {
           <div className="border-t border-border pt-4">
             <button
               type="button"
-              onClick={signOut}
+              onClick={handleSignOut}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 py-3 font-semibold text-destructive transition-colors hover:bg-destructive/10"
             >
               <LogOut className="size-4" />

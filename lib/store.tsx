@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useCallback,
   type ReactNode,
@@ -41,6 +42,7 @@ import {
   updateInvite as updateInviteDB,
   removeInvite as removeInviteDB,
   upsertProfile,
+  updateDefaultContext as updateDefaultContextDB,
   type ExpenseFilter,
 } from './supabase/queries'
 import { showError } from './toast'
@@ -89,6 +91,7 @@ interface AppState {
   leaveHousehold: (householdId: string) => Promise<void>
   removeMember: (householdId: string, memberId: string) => Promise<void>
   updateProfile: (name: string, color: string) => Promise<void>
+  setDefaultContext: (value: string) => Promise<void>
 
   refresh: () => Promise<void>
 }
@@ -109,6 +112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [repayments, setRepayments] = useState<Repayment[]>([])
   const [selectedContext, setSelectedContext] = useState<string>('personal')
   const [busy, setBusy] = useState(false)
+  const defaultContextAppliedRef = useRef(false)
 
   const wrapBusy = useCallback(<T extends (...args: any[]) => Promise<any>>(fn: T): T => {
     return (async (...args: Parameters<T>) => {
@@ -128,55 +132,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return
       }
 
-    setCurrentUserId(user.id)
-    setMembers([user])
+      setCurrentUserId(user.id)
+      setMembers([user])
 
-    // Load households
-    const hh = await getMyHouseholds(user.id)
-    setHouseholds(hh)
+      // Load households
+      const hh = await getMyHouseholds(user.id)
+      setHouseholds(hh)
 
-    // If we have households and no context set, default to first household
-    if (hh.length > 0 && selectedContext === 'personal') {
-      // Keep personal as default until user switches
-    }
+      // Apply the user's saved default context once, on the very first
+      // load — never on a later refresh(), so it doesn't fight with
+      // wherever the user has since navigated to.
+      if (!defaultContextAppliedRef.current) {
+        defaultContextAppliedRef.current = true
+        const preferred = user.defaultContext
+        if (preferred && hh.some((h) => h.id === preferred)) {
+          setSelectedContext(preferred)
+        }
+      }
 
-    // Load all members from all households
-    const allMemberIds = new Set<string>([user.id])
-    for (const h of hh) {
-      for (const mid of h.memberIds) allMemberIds.add(mid)
-    }
-    const allProfs = await getAllMembers([...allMemberIds])
-    setMembers(allProfs)
+      // Load all members from all households
+      const allMemberIds = new Set<string>([user.id])
+      for (const h of hh) {
+        for (const mid of h.memberIds) allMemberIds.add(mid)
+      }
+      const personalFilter: ExpenseFilter = { scope: 'personal', ownerId: user.id }
 
-    // Load expenses, goals, savings for all scopes
-    const allExpenses: Expense[] = []
-    const allGoals: Goal[] = []
-    const allSavings: SavingsMovement[] = []
-    const allRepayments: Repayment[] = []
+      // Everything below is independent — fire it all in parallel instead
+      // of one giant sequential chain, so a single slow/failing request
+      // doesn't stretch out the window where a mid-flight token refresh
+      // can take the whole load down.
+      const [allProfs, personalExpenses, personalGoals, personalSavings, perHousehold] =
+        await Promise.all([
+          getAllMembers([...allMemberIds]),
+          getExpenses(personalFilter),
+          getGoals(personalFilter),
+          getSavings(personalFilter, [user.id]),
+          Promise.all(
+            hh.map(async (h) => {
+              const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
+              const [exp, goals, sav, rep] = await Promise.all([
+                getExpenses(hhFilter),
+                getGoals(hhFilter),
+                getSavings(hhFilter, h.memberIds),
+                getRepayments(h.id),
+              ])
+              return { exp, goals, sav, rep }
+            }),
+          ),
+        ])
 
-    // Personal
-    const personalFilter: ExpenseFilter = { scope: 'personal', ownerId: user.id }
-    allExpenses.push(...(await getExpenses(personalFilter)))
-    allGoals.push(...(await getGoals(personalFilter)))
-
-    // Household scopes
-    for (const h of hh) {
-      const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
-      allExpenses.push(...(await getExpenses(hhFilter)))
-      allGoals.push(...(await getGoals(hhFilter)))
-      allSavings.push(...(await getSavings(hhFilter, h.memberIds)))
-      allRepayments.push(...(await getRepayments(h.id)))
-    }
-
-    // Personal savings
-    allSavings.push(
-      ...(await getSavings(personalFilter, [user.id])),
-    )
-
-    setExpenses(allExpenses)
-    setGoals(allGoals)
-    setSavings(allSavings)
-    setRepayments(allRepayments)
+      setMembers(allProfs)
+      setExpenses([...personalExpenses, ...perHousehold.flatMap((r) => r.exp)])
+      setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
+      setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
+      setRepayments(perHousehold.flatMap((r) => r.rep))
       setLoading(false)
     } catch (error) {
       setLoading(false)
@@ -184,11 +193,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showError(error)
       throw error
     }
-  }, [selectedContext])
+  }, [])
 
   useEffect(() => {
-    loadData().catch(() => undefined)
-  }, [])
+    let cancelled = false
+    loadData().catch(() => {
+      if (cancelled) return
+      // One automatic retry after a short delay — covers a transient
+      // auth-token refresh landing mid-load, which is what today makes
+      // the user manually reload the page to recover.
+      setTimeout(() => {
+        if (!cancelled) loadData().catch(() => undefined)
+      }, 1000)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [loadData])
 
   // ─── derived ──────────────────────────────────────────────────────
   const value = useMemo<AppState>(() => {
@@ -357,6 +378,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           prev.map((m) =>
             m.id === currentUserId ? { ...m, name, color: color as any } : m,
           ),
+        )
+      }),
+      setDefaultContext: wrapBusy(async (value) => {
+        if (!currentUserId) return
+        await updateDefaultContextDB(currentUserId, value === 'personal' ? null : value)
+        setMembers((prev) =>
+          prev.map((m) => (m.id === currentUserId ? { ...m, defaultContext: value } : m)),
         )
       }),
 

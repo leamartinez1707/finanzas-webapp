@@ -19,6 +19,7 @@ export interface Member {
   email: string
   color: PersonColor
   joinedAt: string // ISO date
+  defaultContext?: string // 'personal' or a household id — only meaningful on the current user
 }
 
 export type InviteStatus = 'pendiente' | 'aceptada' | 'rechazada' | 'expirada'

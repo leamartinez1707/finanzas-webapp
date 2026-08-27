@@ -15,11 +15,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) {
         showError(error)
-        router.replace('/')
+        router.replace('/ingresar')
         return
       }
       if (!session) {
-        router.replace('/')
+        router.replace('/ingresar')
         return
       }
 
@@ -31,7 +31,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
       if (profileError) {
         showError(profileError)
-        router.replace('/')
+        router.replace('/ingresar')
         return
       }
 
