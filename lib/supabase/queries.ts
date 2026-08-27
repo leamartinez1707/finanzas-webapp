@@ -48,6 +48,7 @@ function toMember(row: any): Member {
     email: row.email ?? '',
     color: (row.color as PersonColor) ?? 'person-1',
     joinedAt: row.creado_en ?? new Date().toISOString(),
+    defaultContext: row.default_context ?? undefined,
   }
 }
 
@@ -105,7 +106,15 @@ export function supabase() {
 
 export async function getCurrentUser(): Promise<Member | null> {
   const s = supabase()
-  const { data: { user } } = await s.auth.getUser()
+  const { data: { user }, error: userError } = await s.auth.getUser()
+  if (userError) {
+    // "No session at all" is the normal, expected state for an anonymous
+    // visitor (landing page, login page, invite link, etc.) — Supabase
+    // reports it as an error, but it isn't one. Only surface genuinely
+    // unexpected auth failures (a session that existed but broke).
+    if (userError.name === 'AuthSessionMissingError') return null
+    throw userError
+  }
   if (!user) return null
 
   const { data: profile, error } = await s
@@ -131,6 +140,22 @@ export async function upsertProfile(name: string, color: PersonColor) {
     nombre: name,
     color,
   })
+}
+
+export async function updateDefaultContext(userId: string, value: string | null) {
+  const s = supabase()
+  const { error } = await s
+    .from('profiles')
+    .update({ default_context: value })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+export async function signOut() {
+  const s = supabase()
+  const { error } = await s.auth.signOut()
+  if (error) throw error
+  window.location.href = '/'
 }
 
 // ─── Households ─────────────────────────────────────────────────────
@@ -232,22 +257,29 @@ export async function leaveHousehold(householdId: string) {
   const s = supabase()
   const { data: { user } } = await s.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const { error } = await s
+  const { data, error } = await s
     .from('household_members')
     .delete()
     .eq('household_id', householdId)
     .eq('user_id', user.id)
+    .select('user_id')
   if (error) throw error
+  // RLS can silently filter a DELETE down to 0 rows without ever raising
+  // `error` — check the affected rows explicitly so a denied delete surfaces
+  // as a real error instead of a false "success".
+  if (!data?.length) throw new Error('No se pudo salir del hogar.')
 }
 
 export async function removeMember(householdId: string, memberId: string) {
   const s = supabase()
-  const { error } = await s
+  const { data, error } = await s
     .from('household_members')
     .delete()
     .eq('household_id', householdId)
     .eq('user_id', memberId)
+    .select('user_id')
   if (error) throw error
+  if (!data?.length) throw new Error('No se pudo sacar al miembro del hogar.')
 }
 
 // ─── Expenses ───────────────────────────────────────────────────────
