@@ -245,6 +245,8 @@ export default function InicioPage() {
                 const canPay = relatedExpense
                   && relatedExpense.scope === 'household'
                   && relatedExpense.payerId !== currentUser?.id
+                  && currentUser
+                  && expenseShare(relatedExpense, currentUser.id, householdMembers.length) > 0
                 return (
                   <ActivityRow
                     key={item.id}
@@ -353,7 +355,7 @@ export default function InicioPage() {
               toId: payingExpense.payerId,
               currency: payingExpense.currency,
               expenseId: payingExpense.id,
-              amount: expenseShare(payingExpense, householdMembers.length),
+              amount: expenseShare(payingExpense, currentUser.id, householdMembers.length),
             }}
             onSubmit={handlePay}
             onCancel={() => setPayingExpense(undefined)}

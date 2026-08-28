@@ -1,5 +1,5 @@
 import { createClient } from './client'
-import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense } from '../types'
+import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -16,6 +16,8 @@ function toExpense(row: any): Expense {
     currency: row.moneda as CurrencyCode,
     date: row.fecha,
     recurringExpenseId: row.recurring_expense_id ?? undefined,
+    shares: row.shares ?? undefined,
+    splitSnapshot: row.split_snapshot ?? undefined,
   }
 }
 
@@ -83,6 +85,7 @@ function toHousehold(row: any): Household {
       sentAt: i.creado_en,
     })),
     ownerId: row.creado_por ?? undefined,
+    defaultSplit: row.default_split ?? undefined,
   }
 }
 
@@ -260,15 +263,39 @@ export async function createHousehold(name: string, currency: CurrencyCode): Pro
   return data.id
 }
 
+// Percentages must sum to 100 (small float tolerance) and every entry must
+// point at a real member of the household — but not every member needs an
+// entry, so a partial split (e.g. only overriding two of three people) is
+// invalid, not "the rest evenly split the remainder".
+function validateSplitPercent(memberIds: string[], split: SplitPercent[]) {
+  const sum = split.reduce((total, s) => total + s.percent, 0)
+  if (Math.abs(sum - 100) > 0.01) throw new Error('Los porcentajes deben sumar 100')
+  if (split.some((s) => !memberIds.includes(s.memberId))) {
+    throw new Error('La proporción incluye a alguien que no pertenece al hogar')
+  }
+}
+
 export async function updateHousehold(id: string, patch: Partial<Household>) {
   const s = supabase()
-  await s
+
+  if (patch.defaultSplit) {
+    const { data, error: membersError } = await s
+      .from('household_members')
+      .select('user_id')
+      .eq('household_id', id)
+    if (membersError) throw membersError
+    validateSplitPercent((data ?? []).map((m) => m.user_id), patch.defaultSplit)
+  }
+
+  const { error } = await s
     .from('households')
     .update({
       ...(patch.name !== undefined && { nombre: patch.name }),
       ...(patch.currency !== undefined && { moneda_default: patch.currency }),
+      ...(patch.defaultSplit !== undefined && { default_split: patch.defaultSplit }),
     })
     .eq('id', id)
+  if (error) throw error
 }
 
 export async function leaveHousehold(householdId: string) {
@@ -321,7 +348,18 @@ export async function getExpenses(filter: ExpenseFilter): Promise<Expense[]> {
   return (data ?? []).map(toExpense)
 }
 
+// Sum of `shares` amounts must equal the expense's own amount (small
+// currency-rounding tolerance) — same molde as validateRepaymentExpense.
+function validateShares(amount: number, shares: ExpenseShare[]) {
+  const sum = shares.reduce((total, s) => total + s.amount, 0)
+  if (Math.abs(sum - amount) > 0.01) {
+    throw new Error('La suma de las partes debe ser igual al monto del gasto')
+  }
+}
+
 export async function addExpense(e: Omit<Expense, 'id'>): Promise<Expense> {
+  if (e.shares) validateShares(e.amount, e.shares)
+
   const s = supabase()
   const { data, error } = await s
     .from('expenses')
@@ -335,6 +373,8 @@ export async function addExpense(e: Omit<Expense, 'id'>): Promise<Expense> {
       monto: e.amount,
       moneda: e.currency,
       fecha: e.date,
+      shares: e.shares ?? null,
+      split_snapshot: e.splitSnapshot ?? null,
     })
     .select('*')
     .single()
@@ -352,6 +392,23 @@ export async function updateExpense(id: string, patch: Partial<Expense>) {
   if (patch.currency !== undefined) update.moneda = patch.currency
   if (patch.payerId !== undefined) update.payer_id = patch.payerId
   if (patch.date !== undefined) update.fecha = patch.date
+  if (patch.shares !== undefined) update.shares = patch.shares
+  if (patch.splitSnapshot !== undefined) update.split_snapshot = patch.splitSnapshot
+
+  if (patch.shares) {
+    let amount = patch.amount
+    if (amount === undefined) {
+      const { data, error: currentError } = await s
+        .from('expenses')
+        .select('monto')
+        .eq('id', id)
+        .maybeSingle()
+      if (currentError) throw currentError
+      if (!data) throw new Error('Gasto no encontrado')
+      amount = Number(data.monto)
+    }
+    validateShares(amount, patch.shares)
+  }
 
   const { error } = await s.from('expenses').update(update).eq('id', id)
   if (error) throw error

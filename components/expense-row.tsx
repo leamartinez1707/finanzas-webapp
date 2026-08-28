@@ -26,7 +26,7 @@ export function ExpenseRow({
   const { getMember, currentUserId } = useApp()
   const payer = getMember(expense.payerId)
 
-  const share = expenseShare(expense, members)
+  const share = expenseShare(expense, currentUserId ?? '', members)
   const isPayer = expense.payerId === currentUserId
 
   const expenseDate = new Date(expense.date)

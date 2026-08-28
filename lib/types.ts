@@ -31,6 +31,9 @@ export interface Invite {
   sentAt: string
 }
 
+export interface ExpenseShare { memberId: string; amount: number }
+export interface SplitPercent { memberId: string; percent: number }
+
 export interface Household {
   id: string
   name: string
@@ -38,6 +41,7 @@ export interface Household {
   memberIds: string[]
   invites: Invite[]
   ownerId?: string
+  defaultSplit?: SplitPercent[] | null
 }
 
 export interface Expense {
@@ -52,6 +56,8 @@ export interface Expense {
   currency: CurrencyCode
   date: string // ISO date
   recurringExpenseId?: string | null // set when generated from a RecurringExpense template
+  shares?: ExpenseShare[] | null // manual per-expense override (fixed amounts)
+  splitSnapshot?: SplitPercent[] | null // frozen copy of household.defaultSplit at creation time
 }
 
 export interface RecurringExpense {

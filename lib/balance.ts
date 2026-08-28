@@ -41,7 +41,7 @@ export function computeBalances(
     const currencyExpenses = filteredExpenses.filter((e) => e.scope === 'household' && e.currency === currency)
     const currencyRepayments = filteredRepayments.filter((r) => r.currency === currency)
     const paid = currencyExpenses.filter((e) => e.payerId === member.id).reduce((s, e) => s + e.amount, 0)
-    const share = currencyExpenses.reduce((s, e) => s + e.amount / Math.max(members.length, 1), 0)
+    const share = currencyExpenses.reduce((s, e) => s + expenseShare(e, member.id, members.length), 0)
     const outgoing = currencyRepayments.filter((r) => r.fromId === member.id).reduce((s, r) => s + r.amount, 0)
     const incoming = currencyRepayments.filter((r) => r.toId === member.id).reduce((s, r) => s + r.amount, 0)
     return { memberId: member.id, currency, paid, share, outgoing, incoming, net: paid - share + outgoing - incoming }
@@ -50,7 +50,16 @@ export function computeBalances(
   return { balances, currencies: [...currencies] }
 }
 
-export function expenseShare(expense: Expense, memberCount: number): number {
+// Resolves how much of `expense` is memberId's share, looking only at the
+// expense itself (manual override → frozen household-split snapshot → even
+// 1/N fallback) — never at the household's current default_split, since
+// that config only applies to expenses created after it was set.
+export function expenseShare(expense: Expense, memberId: string, memberCount: number): number {
+  if (expense.shares) return expense.shares.find((s) => s.memberId === memberId)?.amount ?? 0
+  if (expense.splitSnapshot) {
+    const pct = expense.splitSnapshot.find((s) => s.memberId === memberId)?.percent ?? 0
+    return Math.round((expense.amount * pct) / 100)
+  }
   return memberCount > 1 ? Math.round(expense.amount / memberCount) : expense.amount
 }
 

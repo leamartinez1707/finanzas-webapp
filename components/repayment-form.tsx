@@ -109,7 +109,7 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
                 } else {
                   setExpenseId(e.id)
                   setExpenseSearch(e.description)
-                  setAmount(String(expenseShare(e, householdMembers.length)))
+                  setAmount(String(expenseShare(e, fromId, householdMembers.length)))
                 }
                 setExpenseOpen(false)
               }}

@@ -22,7 +22,7 @@ import { Sheet } from '@/components/sheet'
 import { PersonAvatar } from '@/components/person-avatar'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { CurrencyCode } from '@/lib/types'
+import type { CurrencyCode, Household, Member, SplitPercent } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
 export default function AjustesPage() {
@@ -124,6 +124,15 @@ export default function AjustesPage() {
     }
   }
 
+  async function saveSplit(percents: SplitPercent[] | null) {
+    try {
+      await updateHousehold(activeHousehold!.id, { defaultSplit: percents })
+      showSuccess(percents ? 'División guardada.' : 'División restablecida a partes iguales.')
+    } catch (error) {
+      showError(error)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <ScreenHeader title="Ajustes" subtitle={activeHousehold.name} />
@@ -185,6 +194,20 @@ export default function AjustesPage() {
             )
           })}
         </ul>
+      </section>
+
+      {/* --- split config --- */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          División del hogar
+        </h2>
+        <HouseholdSplitForm
+          key={`${activeHousehold.id}:${activeHousehold.defaultSplit?.map((s) => `${s.memberId}-${s.percent}`).join(',') ?? 'even'}`}
+          household={activeHousehold}
+          members={householdMembers.filter((m): m is NonNullable<typeof m> => Boolean(m))}
+          currentUserId={currentUser?.id}
+          onSave={saveSplit}
+        />
       </section>
 
       {/* --- invites --- */}
@@ -378,5 +401,114 @@ export default function AjustesPage() {
         </div>
       </Sheet>
     </div>
+  )
+}
+
+// Local state is initialized straight from props (lazy useState, no effect) —
+// the parent forces a remount via `key` whenever the household or its
+// defaultSplit changes, so this never needs to sync itself after mount.
+function HouseholdSplitForm({
+  household,
+  members,
+  currentUserId,
+  onSave,
+}: {
+  household: Household
+  members: Member[]
+  currentUserId?: string
+  onSave: (percents: SplitPercent[] | null) => void | Promise<void>
+}) {
+  // Even split, rounded to one decimal — the remainder from rounding goes to
+  // the last member so the defaults always sum to exactly 100 (otherwise a
+  // household of e.g. 3 people would land on 33.3/33.3/33.3 = 99.9 and the
+  // save button would start out disabled with nothing touched).
+  const basePercent = members.length > 0 ? Math.floor(1000 / members.length) / 10 : 0
+  const [splitPercents, setSplitPercents] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {}
+    members.forEach((m, i) => {
+      const existing = household.defaultSplit?.find((s) => s.memberId === m.id)
+      if (existing) {
+        initial[m.id] = String(existing.percent)
+        return
+      }
+      const isLast = i === members.length - 1
+      const value = isLast ? Math.round((100 - basePercent * (members.length - 1)) * 10) / 10 : basePercent
+      initial[m.id] = String(value)
+    })
+    return initial
+  })
+  const [saving, setSaving] = useState(false)
+
+  const splitSum = Object.values(splitPercents).reduce((sum, v) => sum + (Number(v) || 0), 0)
+  const splitMatches = Math.abs(splitSum - 100) < 0.01
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!splitMatches) return
+    setSaving(true)
+    try {
+      await onSave(members.map((m) => ({ memberId: m.id, percent: Number(splitPercents[m.id]) || 0 })))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleReset() {
+    setSaving(true)
+    try {
+      await onSave(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <p className="text-xs text-muted-foreground">
+        Definí cómo se reparten los gastos nuevos del hogar. Cambiar esto no afecta a los gastos ya cargados.
+      </p>
+      <div className="space-y-2">
+        {members.map((m) => (
+          <div key={m.id} className="flex items-center gap-3">
+            <PersonAvatar member={m} size="xs" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {m.id === currentUserId ? 'Yo' : m.name}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                inputMode="decimal"
+                value={splitPercents[m.id] ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '')
+                  setSplitPercents((prev) => ({ ...prev, [m.id]: value }))
+                }}
+                className={cn(inputClass, 'w-20 text-right tnum')}
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className={cn('text-xs font-medium', splitMatches ? 'text-positive' : 'text-destructive')}>
+        {splitMatches ? '✓ Suma 100%' : `Suma ${splitSum.toFixed(1)}% (debe sumar 100%)`}
+      </p>
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={saving}
+          className="flex-1 rounded-2xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Partes iguales
+        </button>
+        <button
+          type="submit"
+          disabled={saving || !splitMatches}
+          className="flex-[2] rounded-2xl bg-primary py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? 'Guardando...' : 'Guardar división'}
+        </button>
+      </div>
+    </form>
   )
 }
