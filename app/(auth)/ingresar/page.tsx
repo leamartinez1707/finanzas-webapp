@@ -12,9 +12,7 @@ import { getSpanishErrorMessage } from '@/lib/error-message'
 import { showSuccess } from '@/lib/toast'
 import { safeRedirect } from '@/lib/safe-redirect'
 
-// Google sign-in needs an OAuth client configured in Supabase Auth first —
-// flip this once that's set up (see supabase.com/docs/guides/auth/social-login/auth-google).
-const GOOGLE_AUTH_ENABLED = false
+const GOOGLE_AUTH_ENABLED = true
 
 export default function LoginPage() {
   return (
