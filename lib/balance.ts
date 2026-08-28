@@ -50,6 +50,10 @@ export function computeBalances(
   return { balances, currencies: [...currencies] }
 }
 
+export function expenseShare(expense: Expense, memberCount: number): number {
+  return memberCount > 1 ? Math.round(expense.amount / memberCount) : expense.amount
+}
+
 export function sumByCurrency<T extends { amount: number; currency: CurrencyCode }>(
   items: T[],
 ): Partial<Record<CurrencyCode, number>> {

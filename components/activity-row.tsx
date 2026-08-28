@@ -12,15 +12,25 @@ import { cn } from '@/lib/utils'
 export function ActivityRow({
   item,
   baseCurrency,
+  onClick,
 }: {
   item: ActivityItem
   baseCurrency: CurrencyCode
+  onClick?: () => void
 }) {
   const { getMember } = useApp()
   const member = getMember(item.memberId)
+  const Wrapper = onClick ? 'button' : 'div'
 
   return (
-    <li className="flex items-center gap-2.5 rounded-xl bg-card p-2.5">
+    <li>
+      <Wrapper
+        onClick={onClick}
+        className={cn(
+          'flex w-full items-center gap-2.5 rounded-xl bg-card p-2.5 text-left transition-colors',
+          onClick && 'hover:bg-muted/60 active:scale-[0.99]',
+        )}
+      >
       {item.kind === 'gasto' && item.category ? (
         <CategoryIcon category={item.category} size="md" />
       ) : (
@@ -70,6 +80,7 @@ export function ActivityRow({
         />
         {member && <PersonAvatar member={member} size="xs" />}
       </div>
+      </Wrapper>
     </li>
   )
 }

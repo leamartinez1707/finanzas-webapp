@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
+import { expenseShare } from '@/lib/balance'
 import { isThisMonth } from '@/lib/format'
 import { BalanceCard } from '@/components/balance-card'
 import { ActivityRow } from '@/components/activity-row'
@@ -15,10 +16,11 @@ import { SectionTitle } from '@/components/screen-header'
 import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
+import { RepaymentForm } from '@/components/repayment-form'
 import { PERSON_COLORS } from '@/lib/categories'
 import { signOut } from '@/lib/supabase/queries'
 import { cn } from '@/lib/utils'
-import type { PersonColor } from '@/lib/types'
+import type { Expense, PersonColor, Repayment } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
 export default function InicioPage() {
@@ -36,6 +38,7 @@ export default function InicioPage() {
     myHouseholds,
     updateProfile,
     setDefaultContext,
+    addRepayment,
   } = useApp()
 
   const [profileOpen, setProfileOpen] = useState(false)
@@ -43,6 +46,7 @@ export default function InicioPage() {
   const [profileColor, setProfileColor] = useState<PersonColor>('person-1')
   const [profileDefaultContext, setProfileDefaultContext] = useState('personal')
   const [pendingInvites, setPendingInvites] = useState<any[]>([])
+  const [payingExpense, setPayingExpense] = useState<Expense>()
 
   useEffect(() => {
     import('@/lib/supabase/queries').then(({ getMyPendingInvites }) => {
@@ -79,6 +83,20 @@ export default function InicioPage() {
       showError(error)
     }
   }
+
+  async function handlePay(data: Omit<Repayment, 'id' | 'createdById'>) {
+    try {
+      await addRepayment(data)
+      showSuccess('Pago registrado.')
+      setPayingExpense(undefined)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const householdMembers = activeHousehold
+    ? activeHousehold.memberIds.map((id) => members.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => Boolean(m))
+    : []
 
   const scopeFilter = isPersonal
     ? ({ scope: 'personal', ownerId: currentUser!.id } as const)
@@ -222,9 +240,20 @@ export default function InicioPage() {
           </SectionTitle>
           {activity.length > 0 ? (
             <ul className="flex flex-col gap-2">
-              {activity.map((item) => (
-                <ActivityRow key={item.id} item={item} baseCurrency={activeCurrency} />
-              ))}
+              {activity.map((item) => {
+                const relatedExpense = item.kind === 'gasto' ? expenses.find((e) => e.id === item.id) : undefined
+                const canPay = relatedExpense
+                  && relatedExpense.scope === 'household'
+                  && relatedExpense.payerId !== currentUser?.id
+                return (
+                  <ActivityRow
+                    key={item.id}
+                    item={item}
+                    baseCurrency={activeCurrency}
+                    onClick={canPay ? () => setPayingExpense(relatedExpense) : undefined}
+                  />
+                )
+              })}
             </ul>
           ) : (
             <EmptyState
@@ -312,6 +341,24 @@ export default function InicioPage() {
             </button>
           </div>
         </form>
+      </Sheet>
+
+      {/* Pay-my-share sheet, triggered from an activity row */}
+      <Sheet open={!!payingExpense} onClose={() => setPayingExpense(undefined)} title="Pagar mi parte">
+        {payingExpense && currentUser && (
+          <RepaymentForm
+            key={payingExpense.id}
+            prefill={{
+              fromId: currentUser.id,
+              toId: payingExpense.payerId,
+              currency: payingExpense.currency,
+              expenseId: payingExpense.id,
+              amount: expenseShare(payingExpense, householdMembers.length),
+            }}
+            onSubmit={handlePay}
+            onCancel={() => setPayingExpense(undefined)}
+          />
+        )}
       </Sheet>
     </div>
   )

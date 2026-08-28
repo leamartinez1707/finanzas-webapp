@@ -1,6 +1,7 @@
 'use client'
 
 import { useApp } from '@/lib/store'
+import { expenseShare } from '@/lib/balance'
 import { CATEGORIES } from '@/lib/categories'
 import { CategoryIcon } from '@/components/category-icon'
 import { Money, CurrencyTag } from '@/components/money'
@@ -25,7 +26,7 @@ export function ExpenseRow({
   const { getMember, currentUserId } = useApp()
   const payer = getMember(expense.payerId)
 
-  const share = members > 1 ? Math.round(expense.amount / members) : expense.amount
+  const share = expenseShare(expense, members)
   const isPayer = expense.payerId === currentUserId
 
   const expenseDate = new Date(expense.date)

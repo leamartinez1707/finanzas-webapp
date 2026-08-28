@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
+import { expenseShare } from '@/lib/balance'
 import { CurrencySelect } from '@/components/currency-select'
 import { Field, inputClass } from '@/components/field'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -10,8 +11,11 @@ import { Money } from '@/components/money'
 import type { CurrencyCode, Member, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
+const EXPENSE_RESULTS_LIMIT = 5
+
+export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }: {
   initial?: Repayment
+  prefill?: Partial<Pick<Repayment, 'fromId' | 'toId' | 'amount' | 'currency' | 'expenseId' | 'date'>>
   onSubmit: (data: Omit<Repayment, 'id' | 'createdById'>) => void | Promise<void>
   onCancel?: () => void
   onDelete?: () => void
@@ -19,16 +23,17 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
   const { activeHousehold, activeCurrency, members, expenses, currentUser } = useApp()
   const householdMembers = activeHousehold?.memberIds.map((id) => members.find((m) => m.id === id)).filter(Boolean) ?? []
   const householdExpenses = expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold?.id)
-  const [fromId, setFromId] = useState(initial?.fromId ?? currentUser?.id ?? '')
-  const [toId, setToId] = useState(initial?.toId ?? householdMembers.find((m) => m?.id !== fromId)?.id ?? '')
-  const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
-  const [currency, setCurrency] = useState<CurrencyCode>(initial?.currency ?? activeCurrency)
-  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10))
-  const [expenseId, setExpenseId] = useState(initial?.expenseId ?? '')
+  const [fromId, setFromId] = useState(initial?.fromId ?? prefill?.fromId ?? currentUser?.id ?? '')
+  const [toId, setToId] = useState(initial?.toId ?? prefill?.toId ?? householdMembers.find((m) => m?.id !== fromId)?.id ?? '')
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : prefill?.amount ? String(prefill.amount) : '')
+  const [currency, setCurrency] = useState<CurrencyCode>(initial?.currency ?? prefill?.currency ?? activeCurrency)
+  const [date, setDate] = useState(initial?.date ?? prefill?.date ?? new Date().toISOString().slice(0, 10))
+  const [expenseId, setExpenseId] = useState(initial?.expenseId ?? prefill?.expenseId ?? '')
   const [note, setNote] = useState(initial?.note ?? '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [expenseSearch, setExpenseSearch] = useState('')
+  const [expenseOpen, setExpenseOpen] = useState(false)
   const compatibleExpenses = householdExpenses.filter((e) => e.currency === currency)
 
   const filteredExpenses = useMemo(() => {
@@ -36,6 +41,8 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
     const q = expenseSearch.toLowerCase()
     return compatibleExpenses.filter((e) => e.description.toLowerCase().includes(q))
   }, [compatibleExpenses, expenseSearch])
+  const visibleExpenses = filteredExpenses.slice(0, EXPENSE_RESULTS_LIMIT)
+  const hasMoreExpenses = !expenseSearch.trim() && compatibleExpenses.length > EXPENSE_RESULTS_LIMIT
 
   useEffect(() => {
     if (expenseId && !compatibleExpenses.some((expense) => expense.id === expenseId)) {
@@ -74,7 +81,9 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
       <input
         id="repayment-expense"
         value={expenseSearch}
-        onChange={(e) => setExpenseSearch(e.target.value)}
+        onChange={(e) => { setExpenseSearch(e.target.value); setExpenseOpen(true) }}
+        onFocus={() => setExpenseOpen(true)}
+        onBlur={() => setTimeout(() => setExpenseOpen(false), 120)}
         placeholder="Buscar gasto..."
         className={inputClass}
       />
@@ -87,9 +96,9 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
       {!expenseId && (
         <p className="text-xs text-muted-foreground">Por defecto: <span className="font-medium text-foreground">Pago general</span></p>
       )}
-      {filteredExpenses.length > 0 && (
+      {expenseOpen && visibleExpenses.length > 0 && (
         <div className="max-h-40 overflow-y-auto rounded-2xl border border-border bg-card divide-y divide-border">
-          {filteredExpenses.map((e) => (
+          {visibleExpenses.map((e) => (
             <button
               key={e.id}
               type="button"
@@ -100,7 +109,9 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
                 } else {
                   setExpenseId(e.id)
                   setExpenseSearch(e.description)
+                  setAmount(String(expenseShare(e, householdMembers.length)))
                 }
+                setExpenseOpen(false)
               }}
               className={cn(
                 'flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60',
@@ -112,6 +123,9 @@ export function RepaymentForm({ initial, onSubmit, onCancel, onDelete }: {
             </button>
           ))}
         </div>
+      )}
+      {expenseOpen && hasMoreExpenses && (
+        <p className="text-xs text-muted-foreground">Hay más gastos — escribí para buscar.</p>
       )}
     </div>
     <Field label="Nota" htmlFor="repayment-note" hint="Opcional"><input id="repayment-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: transferencia" className={inputClass} /></Field>
