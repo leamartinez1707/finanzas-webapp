@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { Logo } from '@/components/brand'
+import Header from '@/components/global/Header'
+import Footer from '@/components/global/Footer'
 import { blogPosts, getBlogPost, formatPostDate } from '@/lib/blog-posts'
 
 export function generateStaticParams() {
@@ -35,15 +36,7 @@ export default async function NovedadPage({
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto max-w-5xl px-5 sm:px-8">
-        <header className="flex items-center justify-between py-6">
-          <Logo />
-          <Link
-            href="/ingresar"
-            className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
-          >
-            Ya tengo cuenta
-          </Link>
-        </header>
+        <Header entryHref="/ingresar" entryLabel="Ya tengo cuenta" showNovedadesLink={false} />
 
         <article className="py-10 sm:py-16">
           <Link
@@ -78,13 +71,7 @@ export default async function NovedadPage({
           </div>
         </article>
 
-        <footer className="flex flex-col items-center gap-3 border-t border-border py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
-          <Logo className="opacity-70" />
-          <p>© {new Date().getFullYear()} Nido</p>
-          <Link href="/ingresar" className="font-medium text-foreground hover:underline">
-            Ya tengo cuenta
-          </Link>
-        </footer>
+        <Footer entryHref="/ingresar" entryLabel="Ya tengo cuenta" />
       </div>
     </div>
   )

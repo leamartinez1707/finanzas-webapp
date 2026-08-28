@@ -1,53 +1,39 @@
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
-import { Logo } from '@/components/brand'
-import { createClient } from '@/lib/supabase/server'
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import Header from "@/components/global/Header";
+import Footer from "@/components/global/Footer";
 
 export const metadata = {
-  title: 'Nido — Las cuentas de tu casa, sin planillas',
+  title: "Nido — Las cuentas de tu casa, sin planillas",
   description:
-    'Gastos compartidos con la división que uses en tu casa, objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
-}
+    "Gastos compartidos con la división que uses en tu casa, objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.",
+};
 
 // Deliberately does NOT redirect an already-logged-in user away — the
 // landing page stays browsable regardless of session state. It does still
 // check auth (server-side, no client flash) to swap the "get me in" CTA:
 // logged in → straight to /inicio, logged out → /ingresar.
 export default async function LandingPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const entryHref = user ? '/inicio' : '/ingresar'
-  const entryLabel = user ? 'Entrar al nido' : 'Ya tengo cuenta'
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const entryHref = user ? "/inicio" : "/ingresar";
+  const entryLabel = user ? "Entrar al nido" : "Ya tengo cuenta";
 
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto max-w-5xl px-5 sm:px-8">
         {/* --- nav --- */}
-        <header className="flex items-center justify-between py-6">
-          <Logo />
-          <nav className="flex items-center gap-5 text-sm">
-            <Link
-              href="/novedades"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Novedades
-            </Link>
-            <Link
-              href={entryHref}
-              className="font-semibold text-foreground underline-offset-4 hover:underline"
-            >
-              {entryLabel}
-            </Link>
-          </nav>
-        </header>
+        <Header entryHref={entryHref} entryLabel={entryLabel} />
 
         {/* --- hero --- */}
         <section className="grid items-center gap-10 py-10 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
           <div>
             <h1 className="text-balance text-[2.5rem] font-bold leading-[1.05] tracking-tight sm:text-6xl">
               Lo tuyo, lo suyo,
-              <br />
-              y lo de los dos.
+              <br />y lo de los dos.
             </h1>
             <p className="mt-5 max-w-md text-pretty text-lg leading-relaxed text-muted-foreground">
               Nido junta los gastos compartidos de tu casa, los objetivos de
@@ -72,12 +58,13 @@ export default async function LandingPage() {
             </div>
 
             <p className="mt-6 text-sm text-muted-foreground">
-              Cada gasto en su moneda — pesos, dólares, lo que sea. Gratis para empezar.
+              Cada gasto en su moneda — pesos, dólares, lo que sea. Gratis para
+              empezar.
             </p>
           </div>
 
           <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-700 flex justify-center lg:justify-end">
-            <NestMark className="h-[220px] w-[260px] sm:h-[280px] sm:w-[330px]" />
+            <NestMark className="h-55 w-65 sm:h-70 sm:w-82.5" />
           </div>
         </section>
 
@@ -132,7 +119,8 @@ export default async function LandingPage() {
             Armá tu Nido hoy.
           </h2>
           <p className="mx-auto mt-3 max-w-sm text-pretty text-muted-foreground">
-            Invitás a tu pareja o roommates cuando quieras. Empezar es gratis, con tu mail o con tu cuenta de Google.
+            Invitás a tu pareja o roommates cuando quieras. Empezar es gratis,
+            con tu mail o con tu cuenta de Google.
           </p>
           <Link
             href="/ingresar?modo=registro"
@@ -144,21 +132,10 @@ export default async function LandingPage() {
         </section>
 
         {/* --- footer --- */}
-        <footer className="flex flex-col items-center gap-3 border-t border-border py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
-          <Logo className="opacity-70" />
-          <p>© {new Date().getFullYear()} Nido</p>
-          <div className="flex items-center gap-4">
-            <Link href="/novedades" className="hover:underline">
-              Novedades
-            </Link>
-            <Link href={entryHref} className="font-medium text-foreground hover:underline">
-              {entryLabel}
-            </Link>
-          </div>
-        </footer>
+        <Footer entryHref={entryHref} entryLabel={entryLabel} />
       </div>
     </div>
-  )
+  );
 }
 
 // Two overlapping circles — one per person, in the same palette the app
@@ -167,17 +144,40 @@ export default async function LandingPage() {
 // and what you build together."
 function NestMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 340 280" className={className} role="img" aria-label="Dos círculos superpuestos representando finanzas compartidas">
+    <svg
+      viewBox="0 0 340 280"
+      className={className}
+      role="img"
+      aria-label="Dos círculos superpuestos representando finanzas compartidas"
+    >
       <defs>
         <clipPath id="nido-lens-clip">
           <circle cx="130" cy="140" r="108" />
         </clipPath>
       </defs>
-      <circle cx="130" cy="140" r="108" fill="var(--person-1)" fillOpacity="0.85" />
-      <circle cx="210" cy="140" r="108" fill="var(--person-2)" fillOpacity="0.85" />
-      <circle cx="210" cy="140" r="108" fill="var(--primary)" clipPath="url(#nido-lens-clip)" />
+      <circle
+        cx="130"
+        cy="140"
+        r="108"
+        fill="var(--person-1)"
+        fillOpacity="0.85"
+      />
+      <circle
+        cx="210"
+        cy="140"
+        r="108"
+        fill="var(--person-2)"
+        fillOpacity="0.85"
+      />
+      <circle
+        cx="210"
+        cy="140"
+        r="108"
+        fill="var(--primary)"
+        clipPath="url(#nido-lens-clip)"
+      />
     </svg>
-  )
+  );
 }
 
 function SettlementDemo() {
@@ -191,8 +191,8 @@ function SettlementDemo() {
         <Avatar initial="T" color="var(--person-2)" />
       </div>
       <p className="mt-4 text-center text-sm text-muted-foreground">
-        <span className="font-semibold text-foreground">Mica</span> le debe{' '}
-        <span className="font-semibold text-primary">$U 1.850</span> a{' '}
+        <span className="font-semibold text-foreground">Mica</span> le debe{" "}
+        <span className="font-semibold text-primary">$U 1.850</span> a{" "}
         <span className="font-semibold text-foreground">Tomi</span>
       </p>
       <button
@@ -204,7 +204,7 @@ function SettlementDemo() {
         Registrar pago
       </button>
     </div>
-  )
+  );
 }
 
 function ExpenseDemo() {
@@ -213,13 +213,17 @@ function ExpenseDemo() {
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Supermercado del mes
       </p>
-      <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">$U 4.200</p>
+      <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
+        $U 4.200
+      </p>
       <div className="mt-4 flex items-center gap-2">
         <div className="flex -space-x-2">
           <Avatar initial="M" color="var(--person-1)" size="sm" ring />
           <Avatar initial="T" color="var(--person-2)" size="sm" ring />
         </div>
-        <p className="text-sm text-muted-foreground">dividido 60/40 · $U 2.520 / $U 1.680</p>
+        <p className="text-sm text-muted-foreground">
+          dividido 60/40 · $U 2.520 / $U 1.680
+        </p>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
         <div className="h-full w-3/5 rounded-full bg-primary" />
@@ -228,30 +232,30 @@ function ExpenseDemo() {
         Por partes iguales o al % que uses en tu casa — vos elegís.
       </p>
     </div>
-  )
+  );
 }
 
 function Avatar({
   initial,
   color,
-  size = 'md',
+  size = "md",
   ring = false,
 }: {
-  initial: string
-  color: string
-  size?: 'sm' | 'md'
-  ring?: boolean
+  initial: string;
+  color: string;
+  size?: "sm" | "md";
+  ring?: boolean;
 }) {
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${
-        size === 'sm' ? 'size-8 text-xs' : 'size-11 text-sm'
-      } ${ring ? 'ring-2 ring-card' : ''}`}
+        size === "sm" ? "size-8 text-xs" : "size-11 text-sm"
+      } ${ring ? "ring-2 ring-card" : ""}`}
       style={{ backgroundColor: color }}
     >
       {initial}
     </span>
-  )
+  );
 }
 
 function FeatureCard({
@@ -260,10 +264,10 @@ function FeatureCard({
   detail,
   swatch,
 }: {
-  eyebrow: string
-  title: string
-  detail: string
-  swatch: string
+  eyebrow: string;
+  title: string;
+  detail: string;
+  swatch: string;
 }) {
   return (
     <div className="rounded-3xl border border-border bg-card p-6">
@@ -276,7 +280,9 @@ function FeatureCard({
         {eyebrow}
       </p>
       <h3 className="mt-1.5 text-lg font-bold tracking-tight">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{detail}</p>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        {detail}
+      </p>
     </div>
-  )
+  );
 }
