@@ -10,7 +10,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { CurrencyCode, Expense, Goal, Household, Member, Repayment, SavingsMovement } from './types'
+import type { CurrencyCode, Expense, Goal, Household, Member, RecurringExpense, Repayment, SavingsMovement } from './types'
 import {
   getCurrentUser,
   getMyHouseholds,
@@ -22,6 +22,11 @@ import {
   addExpense as addExpenseDB,
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
+  getRecurringExpenses,
+  addRecurringExpense as addRecurringExpenseDB,
+  updateRecurringExpense as updateRecurringExpenseDB,
+  deleteRecurringExpense as deleteRecurringExpenseDB,
+  generateRecurringExpense,
   addRepayment as addRepaymentDB,
   updateRepayment as updateRepaymentDB,
   deleteRepayment as deleteRepaymentDB,
@@ -46,6 +51,7 @@ import {
   type ExpenseFilter,
 } from './supabase/queries'
 import { showError } from './toast'
+import { monthKey } from './format'
 
 interface AppState {
   currentUserId: string | null
@@ -55,6 +61,7 @@ interface AppState {
   members: Member[]
   households: Household[]
   expenses: Expense[]
+  recurringExpenses: RecurringExpense[]
   goals: Goal[]
   savings: SavingsMovement[]
   repayments: Repayment[]
@@ -72,6 +79,9 @@ interface AppState {
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
   updateExpense: (id: string, e: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
+  addRecurringExpense: (r: Omit<RecurringExpense, 'id' | 'createdById'>) => Promise<void>
+  updateRecurringExpense: (id: string, patch: Partial<RecurringExpense>) => Promise<void>
+  deleteRecurringExpense: (id: string) => Promise<void>
   addRepayment: (r: Omit<Repayment, 'id' | 'createdById'>) => Promise<void>
   updateRepayment: (id: string, patch: Partial<Repayment>) => Promise<void>
   deleteRepayment: (id: string) => Promise<void>
@@ -107,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([])
   const [households, setHouseholds] = useState<Household[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [repayments, setRepayments] = useState<Repayment[]>([])
@@ -161,28 +172,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // of one giant sequential chain, so a single slow/failing request
       // doesn't stretch out the window where a mid-flight token refresh
       // can take the whole load down.
-      const [allProfs, personalExpenses, personalGoals, personalSavings, perHousehold] =
+      const [allProfs, personalExpenses, personalRecurring, personalGoals, personalSavings, perHousehold] =
         await Promise.all([
           getAllMembers([...allMemberIds]),
           getExpenses(personalFilter),
+          getRecurringExpenses(personalFilter),
           getGoals(personalFilter),
           getSavings(personalFilter, [user.id]),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
-              const [exp, goals, sav, rep] = await Promise.all([
+              const [exp, rec, goals, sav, rep] = await Promise.all([
                 getExpenses(hhFilter),
+                getRecurringExpenses(hhFilter),
                 getGoals(hhFilter),
                 getSavings(hhFilter, h.memberIds),
                 getRepayments(h.id),
               ])
-              return { exp, goals, sav, rep }
+              return { exp, rec, goals, sav, rep }
             }),
           ),
         ])
 
+      const allExpenses = [...personalExpenses, ...perHousehold.flatMap((r) => r.exp)]
+      const allRecurring = [...personalRecurring, ...perHousehold.flatMap((r) => r.rec)]
+
+      // Generate this month's expense for any active template that has
+      // reached its dayOfMonth and doesn't already have one. This is only
+      // an optimization — the real duplicate guard is the partial unique
+      // index on expenses(recurring_expense_id, month), which
+      // generateRecurringExpense() catches (23505) and returns null for.
+      const today = new Date()
+      const todayIso = today.toISOString()
+      const currentMonth = monthKey(todayIso)
+      const due = allRecurring.filter(
+        (t) =>
+          t.active &&
+          today.getDate() >= t.dayOfMonth &&
+          !allExpenses.some(
+            (e) => e.recurringExpenseId === t.id && monthKey(e.date) === currentMonth,
+          ),
+      )
+      const generated = due.length
+        ? (await Promise.all(due.map((t) => generateRecurringExpense(t, todayIso)))).filter(
+            (e): e is Expense => e !== null,
+          )
+        : []
+
       setMembers(allProfs)
-      setExpenses([...personalExpenses, ...perHousehold.flatMap((r) => r.exp)])
+      setExpenses([...generated, ...allExpenses])
+      setRecurringExpenses(allRecurring)
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
@@ -229,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       members,
       households,
       expenses,
+      recurringExpenses,
       goals,
       savings,
       repayments,
@@ -255,6 +295,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteExpense: wrapBusy(async (id) => {
         await deleteExpenseDB(id)
         setExpenses((prev) => prev.filter((e) => e.id !== id))
+      }),
+      addRecurringExpense: wrapBusy(async (r) => {
+        const created = await addRecurringExpenseDB(r)
+        setRecurringExpenses((prev) => [created, ...prev])
+      }),
+      updateRecurringExpense: wrapBusy(async (id, patch) => {
+        await updateRecurringExpenseDB(id, patch)
+        setRecurringExpenses((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        )
+      }),
+      deleteRecurringExpense: wrapBusy(async (id) => {
+        await deleteRecurringExpenseDB(id)
+        setRecurringExpenses((prev) => prev.filter((r) => r.id !== id))
       }),
       addRepayment: wrapBusy(async (r) => {
         const created = await addRepaymentDB(r)
@@ -398,6 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     members,
     households,
     expenses,
+    recurringExpenses,
     goals,
     savings,
     repayments,

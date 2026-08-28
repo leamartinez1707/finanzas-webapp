@@ -1,5 +1,5 @@
 import { createClient } from './client'
-import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment } from '../types'
+import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -15,6 +15,24 @@ function toExpense(row: any): Expense {
     amount: Number(row.monto),
     currency: row.moneda as CurrencyCode,
     date: row.fecha,
+    recurringExpenseId: row.recurring_expense_id ?? undefined,
+  }
+}
+
+function toRecurringExpense(row: any): RecurringExpense {
+  return {
+    id: row.id,
+    scope: row.scope,
+    householdId: row.household_id ?? undefined,
+    ownerId: row.owner_id,
+    payerId: row.payer_id,
+    description: row.descripcion,
+    category: row.categoria as CategoryId,
+    amount: Number(row.monto),
+    currency: row.moneda as CurrencyCode,
+    dayOfMonth: row.dia_mes,
+    active: row.activo,
+    createdById: row.created_by,
   }
 }
 
@@ -343,6 +361,109 @@ export async function deleteExpense(id: string) {
   const s = supabase()
   const { error } = await s.from('expenses').delete().eq('id', id)
   if (error) throw error
+}
+
+// ─── Recurring expenses ─────────────────────────────────────────────
+
+export async function getRecurringExpenses(filter: ExpenseFilter): Promise<RecurringExpense[]> {
+  const s = supabase()
+  let query = s.from('recurring_expenses').select('*').order('created_at', { ascending: false })
+
+  if (filter.scope === 'personal') {
+    query = query.eq('scope', 'personal').eq('owner_id', filter.ownerId)
+  } else {
+    query = query.eq('scope', 'household').eq('household_id', filter.householdId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map(toRecurringExpense)
+}
+
+export async function addRecurringExpense(
+  r: Omit<RecurringExpense, 'id' | 'createdById'>,
+): Promise<RecurringExpense> {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await s
+    .from('recurring_expenses')
+    .insert({
+      scope: r.scope,
+      household_id: r.householdId ?? null,
+      owner_id: r.ownerId,
+      payer_id: r.payerId,
+      descripcion: r.description,
+      categoria: r.category,
+      monto: r.amount,
+      moneda: r.currency,
+      dia_mes: r.dayOfMonth,
+      activo: r.active,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return toRecurringExpense(data)
+}
+
+export async function updateRecurringExpense(id: string, patch: Partial<RecurringExpense>) {
+  const s = supabase()
+  const update: Record<string, any> = {}
+  if (patch.description !== undefined) update.descripcion = patch.description
+  if (patch.category !== undefined) update.categoria = patch.category
+  if (patch.amount !== undefined) update.monto = patch.amount
+  if (patch.currency !== undefined) update.moneda = patch.currency
+  if (patch.payerId !== undefined) update.payer_id = patch.payerId
+  if (patch.dayOfMonth !== undefined) update.dia_mes = patch.dayOfMonth
+  if (patch.active !== undefined) update.activo = patch.active
+
+  const { error } = await s.from('recurring_expenses').update(update).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteRecurringExpense(id: string) {
+  const s = supabase()
+  const { error } = await s.from('recurring_expenses').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Generates this month's expense for a recurring template. The client-side
+// due-check in lib/store.tsx is only an optimization — the real guard
+// against duplicates (two household members loading the app at once) is
+// the `expenses_recurring_month_uq` partial unique index in
+// supabase/migrations/009_recurring_expenses.sql. If this insert loses that
+// race, Postgres reports it as a unique-violation (23505); treat that as
+// "already generated" rather than an error.
+export async function generateRecurringExpense(
+  template: RecurringExpense,
+  date: string,
+): Promise<Expense | null> {
+  const s = supabase()
+  const { data, error } = await s
+    .from('expenses')
+    .insert({
+      scope: template.scope,
+      household_id: template.householdId ?? null,
+      user_id: template.ownerId,
+      payer_id: template.payerId,
+      descripcion: template.description,
+      categoria: template.category,
+      monto: template.amount,
+      moneda: template.currency,
+      fecha: date,
+      recurring_expense_id: template.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    if ((error as { code?: string }).code === '23505') return null
+    throw error
+  }
+  return toExpense(data)
 }
 
 export async function getRepayments(householdId: string): Promise<Repayment[]> {

@@ -51,6 +51,22 @@ export interface Expense {
   amount: number
   currency: CurrencyCode
   date: string // ISO date
+  recurringExpenseId?: string | null // set when generated from a RecurringExpense template
+}
+
+export interface RecurringExpense {
+  id: string
+  scope: 'household' | 'personal'
+  householdId?: string
+  ownerId: string
+  payerId: string
+  description: string
+  category: CategoryId
+  amount: number
+  currency: CurrencyCode
+  dayOfMonth: number // 1–28
+  active: boolean
+  createdById: string
 }
 
 export interface Repayment {

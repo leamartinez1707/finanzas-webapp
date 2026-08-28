@@ -8,6 +8,8 @@ import { CATEGORY_LIST } from '@/lib/categories'
 import { ScreenHeader } from '@/components/screen-header'
 import { ExpenseRow } from '@/components/expense-row'
 import { ExpenseForm } from '@/components/expense-form'
+import { RecurringExpenseForm } from '@/components/recurring-expense-form'
+import { CategoryIcon } from '@/components/category-icon'
 import { EmptyState } from '@/components/empty-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
@@ -15,7 +17,7 @@ import { Sheet } from '@/components/sheet'
 import { monthKey, monthLabel } from '@/lib/format'
 import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
-import type { CategoryId, CurrencyCode, Expense } from '@/lib/types'
+import type { CategoryId, CurrencyCode, Expense, RecurringExpense } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
 export default function GastosPage() {
@@ -26,11 +28,15 @@ export default function GastosPage() {
     currentUser,
     members,
     expenses,
+    recurringExpenses,
     repayments,
     loading,
     addExpense,
     updateExpense,
     deleteExpense,
+    addRecurringExpense,
+    updateRecurringExpense,
+    deleteRecurringExpense,
   } = useApp()
 
   // --- filters ---
@@ -40,6 +46,10 @@ export default function GastosPage() {
   // --- add / edit sheet ---
   const [editing, setEditing] = useState<Expense | undefined>(undefined)
   const [adding, setAdding] = useState(false)
+
+  // --- recurring: own add / edit sheet ---
+  const [recurringEditing, setRecurringEditing] = useState<RecurringExpense | undefined>(undefined)
+  const [recurringAdding, setRecurringAdding] = useState(false)
 
   // Coming from a "Nuevo gasto" link elsewhere (e.g. Inicio) — open the
   // sheet straight away instead of making the user click + again.
@@ -73,6 +83,13 @@ export default function GastosPage() {
   }, [expenses, isPersonal, currentUser?.id, activeHousehold, openCategory, openPayer])
 
   const totalsByCurrency = useMemo(() => sumByCurrency(scopedExpenses), [scopedExpenses])
+
+  // --- recurring templates, filtered by scope the same way as expenses ---
+  const scopedRecurring = useMemo(() => {
+    return isPersonal
+      ? recurringExpenses.filter((r) => r.scope === 'personal' && r.ownerId === currentUser?.id)
+      : recurringExpenses.filter((r) => r.scope === 'household' && r.householdId === activeHousehold?.id)
+  }, [recurringExpenses, isPersonal, currentUser?.id, activeHousehold])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Expense[]>()
@@ -119,6 +136,42 @@ export default function GastosPage() {
       return
     }
     setEditing(undefined)
+  }
+
+  async function handleAddRecurring(data: Omit<RecurringExpense, 'id'>) {
+    try {
+      await addRecurringExpense(data)
+      showSuccess('Gasto recurrente agregado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
+    setRecurringAdding(false)
+    setRecurringEditing(undefined)
+  }
+
+  async function handleUpdateRecurring(data: Omit<RecurringExpense, 'id'>) {
+    if (!recurringEditing) return
+    try {
+      await updateRecurringExpense(recurringEditing.id, data)
+      showSuccess('Gasto recurrente actualizado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
+    setRecurringEditing(undefined)
+  }
+
+  async function handleDeleteRecurring() {
+    if (!recurringEditing) return
+    try {
+      await deleteRecurringExpense(recurringEditing.id)
+      showSuccess('Gasto recurrente eliminado.')
+    } catch (error) {
+      showError(error)
+      return
+    }
+    setRecurringEditing(undefined)
   }
 
   function clearFilters() {
@@ -232,6 +285,53 @@ export default function GastosPage() {
         </div>
       </div>
 
+      {/* --- recurring --- */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Recurrentes
+          </h2>
+          <button
+            onClick={() => setRecurringAdding(true)}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+          >
+            <Plus className="size-3.5" />
+            Agregar
+          </button>
+        </div>
+        {scopedRecurring.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {scopedRecurring.map((r) => (
+              <li key={r.id}>
+                <button
+                  onClick={() => setRecurringEditing(r)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/50',
+                    !r.active && 'opacity-50',
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <CategoryIcon category={r.category} size="sm" />
+                    <div>
+                      <p className="text-sm font-medium">{r.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Día {r.dayOfMonth} de cada mes
+                        {!r.active && ' · Pausado'}
+                      </p>
+                    </div>
+                  </div>
+                  <Money amount={r.amount} currency={r.currency} className="text-sm font-semibold tnum" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground ring-1 ring-border/50">
+            Sin gastos recurrentes todavía.
+          </p>
+        )}
+      </section>
+
       {/* --- list --- */}
       {grouped.length > 0 ? (
         <div className="space-y-4">
@@ -303,6 +403,32 @@ export default function GastosPage() {
             onSubmit={handleUpdate}
             onCancel={() => setEditing(undefined)}
             onDelete={handleDelete}
+          />
+        )}
+      </Sheet>
+
+      {/* --- recurring add sheet --- */}
+      <Sheet
+        open={recurringAdding}
+        onClose={() => setRecurringAdding(false)}
+        title={isPersonal ? 'Nuevo recurrente personal' : 'Nuevo recurrente'}
+      >
+        <RecurringExpenseForm onSubmit={handleAddRecurring} onCancel={() => setRecurringAdding(false)} />
+      </Sheet>
+
+      {/* --- recurring edit sheet --- */}
+      <Sheet
+        open={!!recurringEditing}
+        onClose={() => setRecurringEditing(undefined)}
+        title="Editar recurrente"
+      >
+        {recurringEditing && (
+          <RecurringExpenseForm
+            key={recurringEditing.id}
+            initial={recurringEditing}
+            onSubmit={handleUpdateRecurring}
+            onCancel={() => setRecurringEditing(undefined)}
+            onDelete={handleDeleteRecurring}
           />
         )}
       </Sheet>
