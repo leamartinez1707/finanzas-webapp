@@ -27,7 +27,7 @@ export function Logo({
             src="/nido_logo_recortado.webp"
             width={50}
             height={50}
-            alt="Nido"
+            alt="Logo de Nido"
             className={imgSize}
           />
         </Link>

@@ -1,5 +1,5 @@
 import { createClient } from './client'
-import type { Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent } from '../types'
+import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -34,6 +34,19 @@ function toRecurringExpense(row: any): RecurringExpense {
     currency: row.moneda as CurrencyCode,
     dayOfMonth: row.dia_mes,
     active: row.activo,
+    createdById: row.created_by,
+  }
+}
+
+function toBudget(row: any): Budget {
+  return {
+    id: row.id,
+    scope: row.scope,
+    householdId: row.household_id ?? undefined,
+    ownerId: row.owner_id,
+    category: row.category as CategoryId,
+    amount: Number(row.monto),
+    currency: row.moneda as CurrencyCode,
     createdById: row.created_by,
   }
 }
@@ -521,6 +534,63 @@ export async function generateRecurringExpense(
     throw error
   }
   return toExpense(data)
+}
+
+// ─── Budgets ──────────────────────────────────────────────────────
+
+export async function getBudgets(filter: ExpenseFilter): Promise<Budget[]> {
+  const s = supabase()
+  let query = s.from('budgets').select('*').order('created_at', { ascending: false })
+
+  if (filter.scope === 'personal') {
+    query = query.eq('scope', 'personal').eq('owner_id', filter.ownerId)
+  } else {
+    query = query.eq('scope', 'household').eq('household_id', filter.householdId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map(toBudget)
+}
+
+export async function addBudget(b: Omit<Budget, 'id' | 'createdById'>): Promise<Budget> {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await s
+    .from('budgets')
+    .insert({
+      scope: b.scope,
+      household_id: b.householdId ?? null,
+      owner_id: b.ownerId,
+      category: b.category,
+      monto: b.amount,
+      moneda: b.currency,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return toBudget(data)
+}
+
+export async function updateBudget(id: string, patch: Partial<Budget>) {
+  const s = supabase()
+  const update: Record<string, any> = {}
+  if (patch.category !== undefined) update.category = patch.category
+  if (patch.amount !== undefined) update.monto = patch.amount
+  if (patch.currency !== undefined) update.moneda = patch.currency
+
+  const { error } = await s.from('budgets').update(update).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBudget(id: string) {
+  const s = supabase()
+  const { error } = await s.from('budgets').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function getRepayments(householdId: string): Promise<Repayment[]> {

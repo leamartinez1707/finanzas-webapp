@@ -14,6 +14,40 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'presupuestos-por-categoria',
+    title: 'Ponele un techo a cada categoría',
+    excerpt:
+      'Definí cuánto querés gastar por mes en cada categoría y Nido te avisa, sin mandarte notificaciones molestas.',
+    date: '2026-08-28',
+    content: (
+      <>
+        <p key="p1">
+          Hasta ahora Nido era puro registro: cargabas gastos y veías el
+          historial, pero nada te avisaba si te estabas pasando en alguna
+          categoría hasta que ya era tarde.
+        </p>
+        <p key="p2">
+          Ahora podés ponerle un tope mensual a las categorías que quieras —
+          Comida, Salidas, lo que sea — y a medida que cargás gastos ese mes,
+          la barra se va llenando. Pasa a amarillo cerca del límite, y a rojo
+          si te lo pasaste.
+        </p>
+        <p key="p3">
+          Nada de pop-ups ni notificaciones que interrumpen: el aviso es
+          visual, lo ves cuando entrás a mirar tus gastos, no antes.
+        </p>
+        <p key="p4">
+          Funciona igual en modo hogar y en modo personal — cada uno con sus
+          propios topes, en su propia moneda.
+        </p>
+        <p key="p5">
+          Se configura tocando “Presupuestos” en la pantalla de Gastos, con
+          un mes filtrado.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'division-flexible-de-gastos',
     title: 'Repartí los gastos como te haga sentido',
     excerpt:

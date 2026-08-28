@@ -75,6 +75,17 @@ export interface RecurringExpense {
   createdById: string
 }
 
+export interface Budget {
+  id: string
+  scope: 'household' | 'personal'
+  householdId?: string
+  ownerId: string
+  category: CategoryId
+  amount: number
+  currency: CurrencyCode
+  createdById: string
+}
+
 export interface Repayment {
   id: string
   householdId: string

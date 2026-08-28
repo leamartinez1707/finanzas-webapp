@@ -10,7 +10,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { CurrencyCode, Expense, Goal, Household, Member, RecurringExpense, Repayment, SavingsMovement } from './types'
+import type { Budget, CurrencyCode, Expense, Goal, Household, Member, RecurringExpense, Repayment, SavingsMovement } from './types'
 import {
   getCurrentUser,
   getMyHouseholds,
@@ -27,6 +27,10 @@ import {
   updateRecurringExpense as updateRecurringExpenseDB,
   deleteRecurringExpense as deleteRecurringExpenseDB,
   generateRecurringExpense,
+  getBudgets,
+  addBudget as addBudgetDB,
+  updateBudget as updateBudgetDB,
+  deleteBudget as deleteBudgetDB,
   addRepayment as addRepaymentDB,
   updateRepayment as updateRepaymentDB,
   deleteRepayment as deleteRepaymentDB,
@@ -62,6 +66,7 @@ interface AppState {
   households: Household[]
   expenses: Expense[]
   recurringExpenses: RecurringExpense[]
+  budgets: Budget[]
   goals: Goal[]
   savings: SavingsMovement[]
   repayments: Repayment[]
@@ -82,6 +87,9 @@ interface AppState {
   addRecurringExpense: (r: Omit<RecurringExpense, 'id' | 'createdById'>) => Promise<void>
   updateRecurringExpense: (id: string, patch: Partial<RecurringExpense>) => Promise<void>
   deleteRecurringExpense: (id: string) => Promise<void>
+  addBudget: (b: Omit<Budget, 'id' | 'createdById'>) => Promise<void>
+  updateBudget: (id: string, patch: Partial<Budget>) => Promise<void>
+  deleteBudget: (id: string) => Promise<void>
   addRepayment: (r: Omit<Repayment, 'id' | 'createdById'>) => Promise<void>
   updateRepayment: (id: string, patch: Partial<Repayment>) => Promise<void>
   deleteRepayment: (id: string) => Promise<void>
@@ -118,6 +126,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [households, setHouseholds] = useState<Household[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [repayments, setRepayments] = useState<Repayment[]>([])
@@ -198,30 +207,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // of one giant sequential chain, so a single slow/failing request
       // doesn't stretch out the window where a mid-flight token refresh
       // can take the whole load down.
-      const [allProfs, personalExpenses, personalRecurring, personalGoals, personalSavings, perHousehold] =
+      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalGoals, personalSavings, perHousehold] =
         await Promise.all([
           getAllMembers([...allMemberIds]),
           getExpenses(personalFilter),
           getRecurringExpenses(personalFilter),
+          getBudgets(personalFilter),
           getGoals(personalFilter),
           getSavings(personalFilter, [user.id]),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
-              const [exp, rec, goals, sav, rep] = await Promise.all([
+              const [exp, rec, bud, goals, sav, rep] = await Promise.all([
                 getExpenses(hhFilter),
                 getRecurringExpenses(hhFilter),
+                getBudgets(hhFilter),
                 getGoals(hhFilter),
                 getSavings(hhFilter, h.memberIds),
                 getRepayments(h.id),
               ])
-              return { exp, rec, goals, sav, rep }
+              return { exp, rec, bud, goals, sav, rep }
             }),
           ),
         ])
 
       const allExpenses = [...personalExpenses, ...perHousehold.flatMap((r) => r.exp)]
       const allRecurring = [...personalRecurring, ...perHousehold.flatMap((r) => r.rec)]
+      const allBudgets = [...personalBudgets, ...perHousehold.flatMap((r) => r.bud)]
 
       // Generate this month's expense for any active template that has
       // reached its dayOfMonth and doesn't already have one. This is only
@@ -248,6 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMembers(allProfs)
       setExpenses([...generated, ...allExpenses])
       setRecurringExpenses(allRecurring)
+      setBudgets(allBudgets)
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
@@ -295,6 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       households,
       expenses,
       recurringExpenses,
+      budgets,
       goals,
       savings,
       repayments,
@@ -335,6 +349,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteRecurringExpense: wrapBusy(async (id) => {
         await deleteRecurringExpenseDB(id)
         setRecurringExpenses((prev) => prev.filter((r) => r.id !== id))
+      }),
+      addBudget: wrapBusy(async (b) => {
+        const created = await addBudgetDB(b)
+        setBudgets((prev) => [created, ...prev])
+      }),
+      updateBudget: wrapBusy(async (id, patch) => {
+        await updateBudgetDB(id, patch)
+        setBudgets((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+        )
+      }),
+      deleteBudget: wrapBusy(async (id) => {
+        await deleteBudgetDB(id)
+        setBudgets((prev) => prev.filter((b) => b.id !== id))
       }),
       addRepayment: wrapBusy(async (r) => {
         const created = await addRepaymentDB(r)
@@ -479,6 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     households,
     expenses,
     recurringExpenses,
+    budgets,
     goals,
     savings,
     repayments,

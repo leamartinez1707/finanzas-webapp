@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, ListFilter, X, ReceiptText } from 'lucide-react'
+import { Plus, ListFilter, X, ReceiptText, Wallet } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { ScreenHeader } from '@/components/screen-header'
@@ -15,6 +15,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
 import { MonthNav } from '@/components/month-nav'
+import { ProgressBar } from '@/components/progress-bar'
 import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
 import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ export default function GastosPage() {
     members,
     expenses,
     recurringExpenses,
+    budgets,
     repayments,
     loading,
     addExpense,
@@ -38,6 +40,9 @@ export default function GastosPage() {
     addRecurringExpense,
     updateRecurringExpense,
     deleteRecurringExpense,
+    addBudget,
+    updateBudget,
+    deleteBudget,
   } = useApp()
 
   // --- filters ---
@@ -52,6 +57,10 @@ export default function GastosPage() {
   // --- recurring: own add / edit sheet ---
   const [recurringEditing, setRecurringEditing] = useState<RecurringExpense | undefined>(undefined)
   const [recurringAdding, setRecurringAdding] = useState(false)
+
+  // --- budgets: single sheet with one row per category ---
+  const [budgetsOpen, setBudgetsOpen] = useState(false)
+  const [budgetAmounts, setBudgetAmounts] = useState<Record<string, string>>({})
 
   // Coming from a "Nuevo gasto" link elsewhere (e.g. Inicio) — open the
   // sheet straight away instead of making the user click + again.
@@ -93,6 +102,77 @@ export default function GastosPage() {
       ? recurringExpenses.filter((r) => r.scope === 'personal' && r.ownerId === currentUser?.id)
       : recurringExpenses.filter((r) => r.scope === 'household' && r.householdId === activeHousehold?.id)
   }, [recurringExpenses, isPersonal, currentUser?.id, activeHousehold])
+
+  // --- budgets, filtered by scope the same way as expenses ---
+  const scopedBudgets = useMemo(() => {
+    return isPersonal
+      ? budgets.filter((b) => b.scope === 'personal' && b.ownerId === currentUser?.id)
+      : budgets.filter((b) => b.scope === 'household' && b.householdId === activeHousehold?.id)
+  }, [budgets, isPersonal, currentUser?.id, activeHousehold])
+
+  // Reset the sheet's draft amounts from the current budgets right when it
+  // opens, so a previous edit that wasn't saved doesn't linger.
+  function openBudgets() {
+    const init: Record<string, string> = {}
+    for (const c of CATEGORY_LIST) {
+      const existing = scopedBudgets.find((b) => b.category === c.id)
+      init[c.id] = existing ? String(existing.amount) : ''
+    }
+    setBudgetAmounts(init)
+    setBudgetsOpen(true)
+  }
+
+  // Worst status across budgeted categories this month — colors the
+  // "Presupuestos" pill without opening the sheet.
+  const budgetStatus = useMemo<'ok' | 'amber' | 'red'>(() => {
+    let worst: 'ok' | 'amber' | 'red' = 'ok'
+    for (const b of scopedBudgets) {
+      if (b.currency !== activeCurrency || b.amount <= 0) continue
+      const gastado = scopedExpenses
+        .filter((e) => e.category === b.category && e.currency === activeCurrency)
+        .reduce((s, e) => s + e.amount, 0)
+      const pct = gastado / b.amount
+      if (pct >= 1) return 'red'
+      if (pct >= 0.8) worst = 'amber'
+    }
+    return worst
+  }, [scopedBudgets, scopedExpenses, activeCurrency])
+
+  async function handleSaveBudgets() {
+    try {
+      await Promise.all(
+        CATEGORY_LIST.map((c) => {
+          const raw = (budgetAmounts[c.id] ?? '').trim()
+          const amount = Number(raw)
+          const hasAmount = raw !== '' && amount > 0
+          const existing = scopedBudgets.find((b) => b.category === c.id)
+
+          if (hasAmount && !existing) {
+            return addBudget({
+              scope: isPersonal ? 'personal' : 'household',
+              householdId: isPersonal ? undefined : activeHousehold?.id,
+              ownerId: currentUser!.id,
+              category: c.id,
+              amount,
+              currency: activeCurrency,
+            })
+          }
+          if (hasAmount && existing) {
+            return updateBudget(existing.id, { amount, currency: activeCurrency })
+          }
+          if (!hasAmount && existing) {
+            return deleteBudget(existing.id)
+          }
+          return undefined
+        }),
+      )
+      showSuccess('Presupuestos actualizados.')
+    } catch (error) {
+      showError(error)
+      return
+    }
+    setBudgetsOpen(false)
+  }
 
   const grouped = useMemo(() => {
     const map = new Map<string, Expense[]>()
@@ -257,6 +337,23 @@ export default function GastosPage() {
               )
             })}
           </div>
+        )}
+
+        {monthFilter && (
+          <button
+            onClick={openBudgets}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+              budgetStatus === 'red'
+                ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                : budgetStatus === 'amber'
+                  ? 'border-warning/40 bg-warning/15 text-warning-foreground'
+                  : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+            )}
+          >
+            <Wallet className="size-3.5" />
+            Presupuestos
+          </button>
         )}
 
         {hasFilters && (
@@ -456,6 +553,77 @@ export default function GastosPage() {
             onDelete={handleDeleteRecurring}
           />
         )}
+      </Sheet>
+
+      {/* --- budgets sheet --- */}
+      <Sheet
+        open={budgetsOpen}
+        onClose={() => setBudgetsOpen(false)}
+        title="Presupuestos"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Tope mensual por categoría, en {activeCurrency}. Dejá el monto vacío para no llevar tope en esa categoría.
+          </p>
+
+          <div className="space-y-3.5">
+            {CATEGORY_LIST.map((c) => {
+              const raw = budgetAmounts[c.id] ?? ''
+              const amount = Number(raw)
+              const hasAmount = raw.trim() !== '' && amount > 0
+              const gastado = scopedExpenses
+                .filter((e) => e.category === c.id && e.currency === activeCurrency)
+                .reduce((s, e) => s + e.amount, 0)
+              const pct = hasAmount ? (gastado / amount) * 100 : 0
+              const over = hasAmount && pct >= 100
+              const near = hasAmount && pct >= 80 && pct < 100
+
+              return (
+                <div key={c.id} className="space-y-1.5">
+                  <div className="flex items-center gap-3">
+                    <CategoryIcon category={c.id} size="sm" />
+                    <span className="flex-1 text-sm font-medium">{c.label}</span>
+                    <input
+                      inputMode="decimal"
+                      value={raw}
+                      onChange={(e) =>
+                        setBudgetAmounts((prev) => ({
+                          ...prev,
+                          [c.id]: e.target.value.replace(/[^0-9.]/g, ''),
+                        }))
+                      }
+                      placeholder="Sin tope"
+                      className="w-28 rounded-xl border border-border bg-card px-3 py-2 text-right text-sm tnum outline-none transition-shadow placeholder:text-muted-foreground/60 focus:border-ring focus:ring-4 focus:ring-ring/15"
+                    />
+                  </div>
+                  {hasAmount && (
+                    <div className="flex items-center gap-2 pl-8">
+                      <ProgressBar
+                        value={pct}
+                        height="h-1.5"
+                        color={over ? 'var(--destructive)' : near ? 'var(--warning)' : 'var(--primary)'}
+                        className="flex-1"
+                      />
+                      {over && (
+                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                          Superado
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSaveBudgets}
+            className="w-full rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+          >
+            Guardar
+          </button>
+        </div>
       </Sheet>
     </div>
   )
