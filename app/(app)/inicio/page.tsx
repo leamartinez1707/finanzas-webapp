@@ -238,6 +238,13 @@ export default function InicioPage() {
           >
             Actividad reciente
           </SectionTitle>
+          <Link
+            href="/resumen"
+            className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-primary"
+          >
+            Ver resumen del mes
+            <ArrowRight className="size-3.5" />
+          </Link>
           {activity.length > 0 ? (
             <ul className="flex flex-col gap-2">
               {activity.map((item) => {

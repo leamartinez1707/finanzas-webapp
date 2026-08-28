@@ -14,6 +14,38 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'resumen-mensual-y-exportar-csv',
+    title: 'Un resumen de en qué se fue la plata',
+    excerpt:
+      'Nueva pantalla con el total del mes, en qué categorías gastaste más y quién pagó qué — más exportar todo a CSV.',
+    date: '2026-08-28',
+    content: (
+      <>
+        <p key="p1">
+          El historial te muestra cada gasto uno por uno, pero a veces lo que
+          querés es la foto completa: cuánto gastaste este mes, en qué se te
+          fue la plata, y quién puso qué en el hogar.
+        </p>
+        <p key="p2">
+          Para eso está el nuevo Resumen — accesible desde Inicio. Arriba de
+          todo, el total del período con la variación contra el mes anterior.
+          Después, un desglose por categoría ordenado de mayor a menor, y si
+          estás en modo hogar, quién pagó cuánto.
+        </p>
+        <p key="p3">
+          Navegás entre meses igual que en Gastos e Historial, o pasás a “ver
+          todo” si querés mirar el panorama completo en vez de un mes puntual.
+        </p>
+        <p key="p4">
+          Y si necesitás los datos afuera de Nido — para una planilla, para
+          mandárselos a alguien — el botón “Exportar CSV” baja exactamente lo
+          que estás mirando en pantalla, con fecha, descripción, categoría,
+          monto y quién pagó cada gasto.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'presupuestos-por-categoria',
     title: 'Ponele un techo a cada categoría',
     excerpt:

@@ -11,7 +11,7 @@ export function Logo({
   showText?: boolean;
   size?: "md" | "lg";
 }) {
-  const imgSize = size === "lg" ? "h-20" : "h-12 w-fit";
+  const imgSize = "h-auto"
   const text = size === "lg" ? "text-2xl" : "text-xl";
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
@@ -25,7 +25,7 @@ export function Logo({
         >
           <Image
             src="/nido_logo_recortado.webp"
-            width={50}
+            width={60}
             height={50}
             alt="Logo de Nido"
             className={imgSize}
