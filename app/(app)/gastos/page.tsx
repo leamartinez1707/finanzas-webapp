@@ -14,7 +14,8 @@ import { EmptyState } from '@/components/empty-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
-import { monthKey, monthLabel } from '@/lib/format'
+import { MonthNav } from '@/components/month-nav'
+import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
 import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
 import type { CategoryId, CurrencyCode, Expense, RecurringExpense } from '@/lib/types'
@@ -42,6 +43,7 @@ export default function GastosPage() {
   // --- filters ---
   const [openCategory, setOpenCategory] = useState<CategoryId | null>(null)
   const [openPayer, setOpenPayer] = useState<string | null>(null)
+  const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
 
   // --- add / edit sheet ---
   const [editing, setEditing] = useState<Expense | undefined>(undefined)
@@ -78,9 +80,10 @@ export default function GastosPage() {
 
     if (openCategory) list = list.filter((e) => e.category === openCategory)
     if (openPayer) list = list.filter((e) => e.payerId === openPayer)
+    if (monthFilter) list = list.filter((e) => monthKey(e.date) === monthCursorKey(monthFilter))
 
     return [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [expenses, isPersonal, currentUser?.id, activeHousehold, openCategory, openPayer])
+  }, [expenses, isPersonal, currentUser?.id, activeHousehold, openCategory, openPayer, monthFilter])
 
   const totalsByCurrency = useMemo(() => sumByCurrency(scopedExpenses), [scopedExpenses])
 
@@ -331,6 +334,28 @@ export default function GastosPage() {
           </p>
         )}
       </section>
+
+      {/* --- month filter --- */}
+      <div className="flex flex-col items-center gap-1.5">
+        {monthFilter ? (
+          <>
+            <MonthNav value={monthFilter} onChange={setMonthFilter} />
+            <button
+              onClick={() => setMonthFilter(null)}
+              className="text-xs font-medium text-primary"
+            >
+              Ver todo el historial
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setMonthFilter(currentMonthCursor())}
+            className="text-xs font-medium text-primary"
+          >
+            Volver al mes actual
+          </button>
+        )}
+      </div>
 
       {/* --- list --- */}
       {grouped.length > 0 ? (

@@ -90,7 +90,7 @@ export default function OnboardingPage() {
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
         >
           Continuar
-          <ArrowRight className="size-[18px]" />
+          <ArrowRight className="size-4.5" />
         </button>
       </form>
     </div>

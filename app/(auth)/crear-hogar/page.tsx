@@ -38,7 +38,7 @@ export default function CrearHogarPage() {
         className="mb-6 inline-flex size-10 items-center justify-center rounded-full bg-card text-foreground shadow-sm ring-1 ring-border"
         aria-label="Volver"
       >
-        <ArrowLeft className="size-[18px]" />
+        <ArrowLeft className="size-4.5" />
       </button>
 
       {step === 'form' ? (
@@ -74,7 +74,7 @@ export default function CrearHogarPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
               >
                 Crear hogar
-                <ArrowRight className="size-[18px]" />
+                <ArrowRight className="size-4.5" />
               </button>
             </div>
           </form>
@@ -101,7 +101,7 @@ export default function CrearHogarPage() {
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm"
             >
               Ir al inicio
-              <ArrowRight className="size-[18px]" />
+              <ArrowRight className="size-4.5" />
             </button>
           </div>
         </div>

@@ -33,7 +33,7 @@ export function BottomNav() {
                     active && 'bg-primary/12',
                   )}
                 >
-                  <Icon className="size-[18px]" strokeWidth={active ? 2.5 : 2} />
+                  <Icon className="size-4.5" strokeWidth={active ? 2.5 : 2} />
                 </span>
                 {item.label}
               </Link>

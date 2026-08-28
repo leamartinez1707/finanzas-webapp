@@ -83,3 +83,31 @@ export function isThisMonth(iso: string) {
   const now = new Date()
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
 }
+
+export type MonthCursor = { year: number; month: number }
+
+export function currentMonthCursor(): MonthCursor {
+  const now = new Date()
+  return { year: now.getFullYear(), month: now.getMonth() }
+}
+
+export function prevMonthCursor(m: MonthCursor): MonthCursor {
+  return m.month === 0 ? { year: m.year - 1, month: 11 } : { year: m.year, month: m.month - 1 }
+}
+
+export function nextMonthCursor(m: MonthCursor): MonthCursor {
+  return m.month === 11 ? { year: m.year + 1, month: 0 } : { year: m.year, month: m.month + 1 }
+}
+
+export function isSameMonthCursor(a: MonthCursor, b: MonthCursor) {
+  return a.year === b.year && a.month === b.month
+}
+
+export function monthCursorKey(m: MonthCursor) {
+  return `${m.year}-${String(m.month + 1).padStart(2, '0')}`
+}
+
+export function monthCursorLabel(m: MonthCursor) {
+  const label = MONTHS[m.month]
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)} ${m.year}`
+}

@@ -65,7 +65,7 @@ export function AppSidebar() {
             pathname.startsWith('/ajustes') ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
-          <Settings2 className="size-[18px]" aria-hidden />
+          <Settings2 className="size-4.5" aria-hidden />
           Ajustes del hogar
         </Link>
       )}
@@ -75,7 +75,7 @@ export function AppSidebar() {
         onClick={() => signOut().catch(showError)}
         className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
       >
-        <LogOut className="size-[18px]" aria-hidden />
+        <LogOut className="size-4.5" aria-hidden />
         Cerrar sesión
       </button>
     </aside>

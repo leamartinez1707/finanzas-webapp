@@ -1,31 +1,44 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { Logo } from '@/components/brand'
+import { createClient } from '@/lib/supabase/server'
 
 export const metadata = {
   title: 'Nido — Las cuentas de tu casa, sin planillas',
   description:
-    'Gastos compartidos con división 1/N, objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
+    'Gastos compartidos con la división que uses en tu casa, objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
 }
 
 // Deliberately does NOT redirect an already-logged-in user away — the
-// landing page stays browsable regardless of session state. The "already
-// logged in, don't make me log in again" behavior lives on /ingresar
-// instead, since that's the page whose whole purpose is "get me into the
-// app."
-export default function LandingPage() {
+// landing page stays browsable regardless of session state. It does still
+// check auth (server-side, no client flash) to swap the "get me in" CTA:
+// logged in → straight to /inicio, logged out → /ingresar.
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const entryHref = user ? '/inicio' : '/ingresar'
+  const entryLabel = user ? 'Entrar al nido' : 'Ya tengo cuenta'
+
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto max-w-5xl px-5 sm:px-8">
         {/* --- nav --- */}
         <header className="flex items-center justify-between py-6">
           <Logo />
-          <Link
-            href="/ingresar"
-            className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
-          >
-            Ya tengo cuenta
-          </Link>
+          <nav className="flex items-center gap-5 text-sm">
+            <Link
+              href="/novedades"
+              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Novedades
+            </Link>
+            <Link
+              href={entryHref}
+              className="font-semibold text-foreground underline-offset-4 hover:underline"
+            >
+              {entryLabel}
+            </Link>
+          </nav>
         </header>
 
         {/* --- hero --- */}
@@ -48,7 +61,7 @@ export default function LandingPage() {
                 className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
               >
                 Crear mi cuenta
-                <ArrowRight className="size-[18px]" />
+                <ArrowRight className="size-4.5" />
               </Link>
               <Link
                 href="#como-funciona"
@@ -85,12 +98,18 @@ export default function LandingPage() {
 
         {/* --- features --- */}
         <section className="py-10 sm:py-16">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <FeatureCard
               eyebrow="Gastos compartidos"
-              title="División 1/N automática"
-              detail="Cargás el gasto, Nido lo reparte entre quienes viven en la casa."
+              title="Dividilo como te sirva"
+              detail="Por partes iguales, por porcentaje fijo del hogar, o ajustado gasto por gasto. Vos elegís cómo se reparte cada peso."
               swatch="var(--person-1)"
+            />
+            <FeatureCard
+              eyebrow="Gastos recurrentes"
+              title="Lo de siempre, sin cargarlo de nuevo"
+              detail="Alquiler, Internet, el gimnasio — armá la plantilla una vez y Nido la convierte en gasto solo, todos los meses."
+              swatch="var(--person-3)"
             />
             <FeatureCard
               eyebrow="Objetivos en común"
@@ -113,14 +132,14 @@ export default function LandingPage() {
             Armá tu Nido hoy.
           </h2>
           <p className="mx-auto mt-3 max-w-sm text-pretty text-muted-foreground">
-            Invitás a tu pareja o roommates cuando quieras. Empezar es gratis.
+            Invitás a tu pareja o roommates cuando quieras. Empezar es gratis, con tu mail o con tu cuenta de Google.
           </p>
           <Link
             href="/ingresar?modo=registro"
             className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-primary px-7 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
           >
             Crear mi cuenta
-            <ArrowRight className="size-[18px]" />
+            <ArrowRight className="size-4.5" />
           </Link>
         </section>
 
@@ -128,9 +147,14 @@ export default function LandingPage() {
         <footer className="flex flex-col items-center gap-3 border-t border-border py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
           <Logo className="opacity-70" />
           <p>© {new Date().getFullYear()} Nido</p>
-          <Link href="/ingresar" className="font-medium text-foreground hover:underline">
-            Ya tengo cuenta
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/novedades" className="hover:underline">
+              Novedades
+            </Link>
+            <Link href={entryHref} className="font-medium text-foreground hover:underline">
+              {entryLabel}
+            </Link>
+          </div>
         </footer>
       </div>
     </div>
@@ -195,11 +219,14 @@ function ExpenseDemo() {
           <Avatar initial="M" color="var(--person-1)" size="sm" ring />
           <Avatar initial="T" color="var(--person-2)" size="sm" ring />
         </div>
-        <p className="text-sm text-muted-foreground">dividido 1/2 · $U 2.100 c/u</p>
+        <p className="text-sm text-muted-foreground">dividido 60/40 · $U 2.520 / $U 1.680</p>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full w-1/2 rounded-full bg-primary" />
+        <div className="h-full w-3/5 rounded-full bg-primary" />
       </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Por partes iguales o al % que uses en tu casa — vos elegís.
+      </p>
     </div>
   )
 }

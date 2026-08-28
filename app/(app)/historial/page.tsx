@@ -8,8 +8,9 @@ import { ScreenHeader } from '@/components/screen-header'
 import { ActivityRow } from '@/components/activity-row'
 import { EmptyState } from '@/components/empty-state'
 import { PersonAvatar } from '@/components/person-avatar'
+import { MonthNav } from '@/components/month-nav'
 import { CATEGORY_LIST } from '@/lib/categories'
-import { monthKey, monthLabel } from '@/lib/format'
+import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { ActivityKind, CategoryId } from '@/lib/types'
 
@@ -37,6 +38,7 @@ export default function HistorialPage() {
   const [kindFilter, setKindFilter] = useState<ActivityKind | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | null>(null)
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
+  const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
 
   const scopeFilter = useMemo(() => {
     if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser?.id ?? '' }
@@ -53,8 +55,9 @@ export default function HistorialPage() {
     if (kindFilter) list = list.filter((a) => a.kind === kindFilter)
     if (categoryFilter) list = list.filter((a) => a.category === categoryFilter)
     if (memberFilter) list = list.filter((a) => a.memberId === memberFilter)
+    if (monthFilter) list = list.filter((a) => monthKey(a.date) === monthCursorKey(monthFilter))
     return list
-  }, [allActivity, kindFilter, categoryFilter, memberFilter])
+  }, [allActivity, kindFilter, categoryFilter, memberFilter, monthFilter])
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>()
@@ -167,6 +170,28 @@ export default function HistorialPage() {
           >
             <X className="size-3" />
             Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* --- month filter --- */}
+      <div className="flex flex-col items-center gap-1.5">
+        {monthFilter ? (
+          <>
+            <MonthNav value={monthFilter} onChange={setMonthFilter} />
+            <button
+              onClick={() => setMonthFilter(null)}
+              className="text-xs font-medium text-primary"
+            >
+              Ver todo el historial
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setMonthFilter(currentMonthCursor())}
+            className="text-xs font-medium text-primary"
+          >
+            Volver al mes actual
           </button>
         )}
       </div>

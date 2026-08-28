@@ -1,48 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight, HandCoins, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowRight, HandCoins, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { computeBalances, computeSettlements } from '@/lib/balance'
 import { Money } from '@/components/money'
+import { MonthNav } from '@/components/month-nav'
 import { PersonAvatar } from '@/components/person-avatar'
 import { RepaymentForm } from '@/components/repayment-form'
 import { Sheet } from '@/components/sheet'
+import { currentMonthCursor, isSameMonthCursor } from '@/lib/format'
 import { showError, showSuccess } from '@/lib/toast'
 import type { Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-]
-
-function useCurrentMonth() {
-  const now = new Date()
-  return { year: now.getFullYear(), month: now.getMonth() }
-}
-
-function formatMonthLabel(m: { year: number; month: number }) {
-  return `${MONTH_NAMES[m.month]} ${m.year}`
-}
-
-function prevMonth(m: { year: number; month: number }) {
-  return m.month === 0 ? { year: m.year - 1, month: 11 } : { year: m.year, month: m.month - 1 }
-}
-
-function nextMonth(m: { year: number; month: number }) {
-  return m.month === 11 ? { year: m.year + 1, month: 0 } : { year: m.year, month: m.month + 1 }
-}
-
-function isSameMonth(a: { year: number; month: number }, b: { year: number; month: number }) {
-  return a.year === b.year && a.month === b.month
-}
 
 export function BalanceCard() {
   const { activeHousehold, members, expenses, repayments, currentUserId, getMember, addRepayment, updateRepayment, deleteRepayment } = useApp()
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Repayment>()
-  const currentMonth = useCurrentMonth()
+  const currentMonth = currentMonthCursor()
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   if (!activeHousehold) return null
 
@@ -60,7 +36,7 @@ export function BalanceCard() {
   const activeExpensesTotal = filteredExpenses.filter((e) => e.currency === activeHousehold.currency).reduce((s, e) => s + e.amount, 0)
   const myNet = activeBalance?.net ?? 0
   const settled = Math.abs(myNet) < 0.01
-  const isCurrentMonth = isSameMonth(selectedMonth, currentMonth)
+  const isCurrentMonth = isSameMonthCursor(selectedMonth, currentMonth)
 
   async function save(data: Omit<Repayment, 'id' | 'createdById'>) {
     try { await addRepayment(data); showSuccess('Pago registrado.'); setAdding(false) } catch (error) { showError(error) }
@@ -74,9 +50,6 @@ export function BalanceCard() {
     try { await deleteRepayment(editing.id); showSuccess('Pago eliminado.'); setEditing(undefined) } catch (error) { showError(error) }
   }
 
-  const goBack = () => setSelectedMonth(prevMonth(selectedMonth))
-  const goForward = () => setSelectedMonth(nextMonth(selectedMonth))
-
   return <>
     <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm" aria-labelledby="balance-heading">
       <div className="flex items-center justify-between gap-3">
@@ -85,10 +58,8 @@ export function BalanceCard() {
         </h2>
         <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', settled ? 'bg-muted text-muted-foreground' : myNet > 0 ? 'bg-positive/15 text-positive' : 'bg-negative/15 text-destructive')}>{settled ? 'Al día' : myNet > 0 ? 'Te deben' : 'Debés'}</span>
       </div>
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <button onClick={goBack} aria-label="Mes anterior" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors"><ArrowLeft className="size-4" /></button>
-        <span className="min-w-[160px] text-center text-sm font-semibold text-foreground">{formatMonthLabel(selectedMonth)}</span>
-        <button onClick={goForward} aria-label="Mes siguiente" disabled={isCurrentMonth} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ArrowRight className="size-4" /></button>
+      <div className="mt-3">
+        <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
       </div>
       <Money amount={Math.abs(myNet)} currency={activeHousehold.currency} className={cn('mt-3 block text-[44px] text-center leading-none', settled ? 'text-foreground' : myNet > 0 ? 'text-positive' : 'text-destructive')} />
       <p className="mt-2 text-sm text-pretty text-muted-foreground">{settled ? 'No hay saldo pendiente este mes en esta moneda.' : myNet > 0 ? 'Es lo que el resto del hogar te debe este mes.' : 'Es lo que le debés al resto del hogar este mes.'}</p>

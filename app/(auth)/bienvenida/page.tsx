@@ -79,7 +79,7 @@ export default function BienvenidaPage() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground"
           >
             Continuar
-            <ArrowRight className="size-[18px]" />
+            <ArrowRight className="size-4.5" />
           </button>
         </form>
       </Sheet>

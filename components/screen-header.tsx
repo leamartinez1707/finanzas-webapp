@@ -24,7 +24,7 @@ export function ScreenHeader({
           aria-label="Volver"
           className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-muted"
         >
-          <ArrowLeft className="size-[18px]" />
+          <ArrowLeft className="size-4.5" />
         </button>
       )}
       <div className="min-w-0 flex-1">

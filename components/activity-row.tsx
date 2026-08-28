@@ -45,11 +45,11 @@ export function ActivityRow({
           )}
         >
           {item.kind === 'aporte' ? (
-            <Target className="size-[18px]" />
+            <Target className="size-4.5" />
           ) : item.direction === 'in' ? (
-            <PiggyBank className="size-[18px]" />
+            <PiggyBank className="size-4.5" />
           ) : (
-            <ArrowDownLeft className="size-[18px]" />
+            <ArrowDownLeft className="size-4.5" />
           )}
         </span>
       )}

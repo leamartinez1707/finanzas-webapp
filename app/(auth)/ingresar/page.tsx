@@ -112,7 +112,7 @@ function LoginForm() {
               onClick={signInWithGoogle}
               className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-border bg-card py-3.5 text-base font-semibold text-foreground transition-colors hover:bg-muted/50"
             >
-              <GoogleIcon className="size-[18px]" />
+              <GoogleIcon className="size-4.5" />
               Continuar con Google
             </button>
             <div className="mt-5 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -160,7 +160,7 @@ function LoginForm() {
           <form onSubmit={submit} className="mt-6 space-y-4">
             <Field label="Email" htmlFor="email">
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="email"
                     type="email"
@@ -176,7 +176,7 @@ function LoginForm() {
             {mode === 'password' && (
               <Field label="Contraseña" htmlFor="password">
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" />
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="password"
                     type="password"
@@ -205,7 +205,7 @@ function LoginForm() {
                 : isRegister
                   ? 'Crear cuenta'
                   : 'Entrar'}
-              <ArrowRight className="size-[18px]" />
+              <ArrowRight className="size-4.5" />
             </button>
           </form>
         )}
