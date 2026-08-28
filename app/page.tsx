@@ -8,6 +8,11 @@ export const metadata = {
     'Gastos compartidos con división 1/N, objetivos de ahorro en común y tus finanzas personales, todo en un solo lugar.',
 }
 
+// Deliberately does NOT redirect an already-logged-in user away — the
+// landing page stays browsable regardless of session state. The "already
+// logged in, don't make me log in again" behavior lives on /ingresar
+// instead, since that's the page whose whole purpose is "get me into the
+// app."
 export default function LandingPage() {
   return (
     <div className="min-h-dvh bg-background">

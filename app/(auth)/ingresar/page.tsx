@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Sparkles, ArrowLeft, ArrowRight } from 'lucide-react'
@@ -32,6 +32,16 @@ function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+
+  // Already logged in and landed here anyway (e.g. via the landing page's
+  // "Ya tengo cuenta" link, or a stale bookmark) — skip straight to the app
+  // instead of asking for credentials again.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) router.replace(safeRedirect(redirect, '/inicio'))
+    })
+  }, [router, redirect])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()

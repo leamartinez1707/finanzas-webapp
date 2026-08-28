@@ -31,7 +31,7 @@ export default function ObjetivosPage() {
   const scopedGoals = useMemo(() => {
     let list = isPersonal
       ? goals.filter((g) => g.scope === 'personal' && g.ownerId === currentUser?.id)
-      : goals.filter((g) => g.scope === 'household' && g.householdId === activeHousehold!.id)
+      : goals.filter((g) => g.scope === 'household' && g.householdId === activeHousehold?.id)
 
     if (filter === 'activos') {
       list = list.filter((g) => goalSaved(g) < g.target)

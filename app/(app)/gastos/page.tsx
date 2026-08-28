@@ -74,7 +74,7 @@ export default function GastosPage() {
   const scopedExpenses = useMemo(() => {
     let list = isPersonal
       ? expenses.filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id)
-      : expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold!.id)
+      : expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold?.id)
 
     if (openCategory) list = list.filter((e) => e.category === openCategory)
     if (openPayer) list = list.filter((e) => e.payerId === openPayer)

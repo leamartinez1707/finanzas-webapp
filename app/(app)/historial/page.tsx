@@ -39,8 +39,8 @@ export default function HistorialPage() {
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
 
   const scopeFilter = useMemo(() => {
-    if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser!.id }
-    return { scope: 'household' as const, householdId: activeHousehold!.id }
+    if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser?.id ?? '' }
+    return { scope: 'household' as const, householdId: activeHousehold?.id ?? '' }
   }, [isPersonal, currentUser?.id, activeHousehold])
 
   const allActivity = useMemo(

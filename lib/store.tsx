@@ -125,6 +125,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const defaultContextAppliedRef = useRef(false)
 
+  // Avoid the "flashes personal, then switches to the real household" jump
+  // on reload: the initial state above has to stay 'personal' (SSR/first
+  // paint can't read localStorage without a hydration mismatch), but as
+  // soon as we're on the client we can apply the last-selected context
+  // immediately — well before loadData()'s network round-trip would
+  // otherwise correct it. loadData() still re-applies the user's saved
+  // defaultContext from the server afterwards, same as always; this is
+  // just a faster first guess, not a new source of truth.
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('nido:selectedContext')
+      if (cached) setSelectedContext(cached)
+    } catch {
+      // localStorage unavailable (private mode, etc.) — fall through to
+      // the normal server-driven default.
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nido:selectedContext', selectedContext)
+    } catch {
+      // ignore — this is a UX nicety, not a requirement
+    }
+  }, [selectedContext])
+
   const wrapBusy = useCallback(<T extends (...args: any[]) => Promise<any>>(fn: T): T => {
     return (async (...args: Parameters<T>) => {
       setBusy(true)
