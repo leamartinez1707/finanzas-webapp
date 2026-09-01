@@ -1,13 +1,15 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Clock3, ListFilter, X, ReceiptText, Target, PiggyBank, HandCoins } from 'lucide-react'
+import { Clock3, ListFilter, ReceiptText, Target, PiggyBank, HandCoins } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { ScreenHeader } from '@/components/screen-header'
 import { ActivityRow } from '@/components/activity-row'
 import { EmptyState } from '@/components/empty-state'
 import { PersonAvatar } from '@/components/person-avatar'
+import { Sheet } from '@/components/sheet'
+import { FilterTrigger, ActiveFilterPills, FilterSection } from '@/components/filter-sheet'
 import { MonthNav } from '@/components/month-nav'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
@@ -39,6 +41,7 @@ export default function HistorialPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | null>(null)
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
   const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const scopeFilter = useMemo(() => {
     if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser?.id ?? '' }
@@ -89,90 +92,43 @@ export default function HistorialPage() {
     <div className="space-y-4">
       <ScreenHeader title="Historial" subtitle="Todos los movimientos" />
 
-      {/* --- kind filters --- */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {(['gasto', 'aporte', 'ahorro', 'pago'] as ActivityKind[]).map((kind) => {
-          const active = kindFilter === kind
-          const { label, icon: Icon } = KIND_LABELS[kind]
-          return (
-            <button
-              key={kind}
-              onClick={() => setKindFilter(active ? null : kind)}
-              className={cn(
-                'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                active
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-              )}
-            >
-              <Icon className="size-3.5" />
-              {label}
-            </button>
-          )
-        })}
+      {/* --- filters --- */}
+      <FilterTrigger
+        onClick={() => setFiltersOpen(true)}
+        activeCount={(kindFilter ? 1 : 0) + (categoryFilter ? 1 : 0) + (memberFilter ? 1 : 0)}
+      />
 
-        {/* category filter (only for gastos) */}
-        {(!kindFilter || kindFilter === 'gasto') && (
-          <div className="flex gap-1.5 border-l border-border pl-2">
-            {CATEGORY_LIST.map((c) => {
-              const active = categoryFilter === c.id
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setCategoryFilter(active ? null : c.id)}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-                  )}
-                >
-                  <span
-                    className="size-1.5 rounded-full"
-                    style={{ backgroundColor: c.color }}
-                  />
-                  {c.label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* person filter */}
-        {peopleInActivity.length > 1 && (
-          <div className="flex gap-1.5 border-l border-border pl-2">
-            {peopleInActivity.map((m) => {
-              if (!m) return null
-              const active = memberFilter === m.id
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => setMemberFilter(active ? null : m.id)}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-                  )}
-                >
-                  <PersonAvatar member={m} size="xs" />
-                  {m.id === currentUser?.id ? 'Yo' : m.name.split(' ')[0]}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-destructive/30 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
-          >
-            <X className="size-3" />
-            Limpiar
-          </button>
-        )}
-      </div>
+      {hasFilters && (
+        <ActiveFilterPills
+          pills={[
+            ...(kindFilter
+              ? [{ key: 'kind', label: KIND_LABELS[kindFilter].label, onRemove: () => setKindFilter(null) }]
+              : []),
+            ...(categoryFilter
+              ? [
+                  {
+                    key: 'category',
+                    label: CATEGORY_LIST.find((c) => c.id === categoryFilter)?.label ?? '',
+                    onRemove: () => setCategoryFilter(null),
+                  },
+                ]
+              : []),
+            ...(memberFilter
+              ? [
+                  {
+                    key: 'member',
+                    label:
+                      memberFilter === currentUser?.id
+                        ? 'Yo'
+                        : (peopleInActivity.find((m) => m?.id === memberFilter)?.name.split(' ')[0] ?? ''),
+                    onRemove: () => setMemberFilter(null),
+                  },
+                ]
+              : []),
+          ]}
+          onClearAll={clearFilters}
+        />
+      )}
 
       {/* --- month filter --- */}
       <div className="flex flex-col items-center gap-1.5">
@@ -229,6 +185,83 @@ export default function HistorialPage() {
           }
         />
       )}
+
+      {/* --- filters sheet --- */}
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros">
+        <div className="space-y-5">
+          <FilterSection title="Tipo">
+            {(['gasto', 'aporte', 'ahorro', 'pago'] as ActivityKind[]).map((kind) => {
+              const active = kindFilter === kind
+              const { label, icon: Icon } = KIND_LABELS[kind]
+              return (
+                <button
+                  key={kind}
+                  onClick={() => setKindFilter(active ? null : kind)}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                  {label}
+                </button>
+              )
+            })}
+          </FilterSection>
+
+          {(!kindFilter || kindFilter === 'gasto') && (
+            <FilterSection title="Categoría">
+              {CATEGORY_LIST.map((c) => {
+                const active = categoryFilter === c.id
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setCategoryFilter(active ? null : c.id)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                    )}
+                  >
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: c.color }}
+                    />
+                    {c.label}
+                  </button>
+                )
+              })}
+            </FilterSection>
+          )}
+
+          {peopleInActivity.length > 1 && (
+            <FilterSection title="Persona">
+              {peopleInActivity.map((m) => {
+                if (!m) return null
+                const active = memberFilter === m.id
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setMemberFilter(active ? null : m.id)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                    )}
+                  >
+                    <PersonAvatar member={m} size="xs" />
+                    {m.id === currentUser?.id ? 'Yo' : m.name.split(' ')[0]}
+                  </button>
+                )
+              })}
+            </FilterSection>
+          )}
+        </div>
+      </Sheet>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, ListFilter, X, ReceiptText, Wallet } from 'lucide-react'
+import { Plus, ListFilter, ReceiptText, Wallet } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { ScreenHeader } from '@/components/screen-header'
@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/empty-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
+import { FilterTrigger, ActiveFilterPills, FilterSection } from '@/components/filter-sheet'
 import { MonthNav } from '@/components/month-nav'
 import { ProgressBar } from '@/components/progress-bar'
 import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
@@ -61,6 +62,9 @@ export default function GastosPage() {
   // --- budgets: single sheet with one row per category ---
   const [budgetsOpen, setBudgetsOpen] = useState(false)
   const [budgetAmounts, setBudgetAmounts] = useState<Record<string, string>>({})
+
+  // --- filters: sheet with category + payer sections ---
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Coming from a "Nuevo gasto" link elsewhere (e.g. Inicio) — open the
   // sheet straight away instead of making the user click + again.
@@ -289,55 +293,11 @@ export default function GastosPage() {
       />
 
       {/* --- filters --- */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {/* category filter */}
-        <div className="flex gap-1.5">
-          {CATEGORY_LIST.map((c) => {
-            const active = openCategory === c.id
-            return (
-              <button
-                key={c.id}
-                onClick={() => setOpenCategory(active ? null : c.id)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  active
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-                )}
-              >
-                <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: c.color }}
-                />
-                {c.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* payer filter (household only) */}
-        {householdMembers.length > 1 && (
-          <div className="flex gap-1.5 border-l border-border pl-2">
-            {householdMembers.map((m) => {
-              const active = openPayer === m!.id
-              return (
-                <button
-                  key={m!.id}
-                  onClick={() => setOpenPayer(active ? null : m!.id)}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-                  )}
-                >
-                  <PersonAvatar member={m!} size="xs" />
-                  {m!.id === currentUser?.id ? 'Yo' : m!.name.split(' ')[0]}
-                </button>
-              )
-            })}
-          </div>
-        )}
+      <div className="flex items-center gap-2">
+        <FilterTrigger
+          onClick={() => setFiltersOpen(true)}
+          activeCount={(openCategory ? 1 : 0) + (openPayer ? 1 : 0)}
+        />
 
         {monthFilter && (
           <button
@@ -355,17 +315,36 @@ export default function GastosPage() {
             Presupuestos
           </button>
         )}
-
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-destructive/30 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
-          >
-            <X className="size-3" />
-            Limpiar
-          </button>
-        )}
       </div>
+
+      {hasFilters && (
+        <ActiveFilterPills
+          pills={[
+            ...(openCategory
+              ? [
+                  {
+                    key: 'category',
+                    label: CATEGORY_LIST.find((c) => c.id === openCategory)?.label ?? '',
+                    onRemove: () => setOpenCategory(null),
+                  },
+                ]
+              : []),
+            ...(openPayer
+              ? [
+                  {
+                    key: 'payer',
+                    label:
+                      openPayer === currentUser?.id
+                        ? 'Yo'
+                        : (householdMembers.find((m) => m!.id === openPayer)?.name.split(' ')[0] ?? ''),
+                    onRemove: () => setOpenPayer(null),
+                  },
+                ]
+              : []),
+          ]}
+          onClearAll={clearFilters}
+        />
+      )}
 
       {/* --- summary --- */}
       <div className="flex items-center justify-between rounded-xl bg-card px-3 py-2.5 ring-1 ring-border/50">
@@ -502,6 +481,58 @@ export default function GastosPage() {
           }
         />
       )}
+
+      {/* --- filters sheet --- */}
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros">
+        <div className="space-y-5">
+          <FilterSection title="Categoría">
+            {CATEGORY_LIST.map((c) => {
+              const active = openCategory === c.id
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setOpenCategory(active ? null : c.id)}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                  )}
+                >
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: c.color }}
+                  />
+                  {c.label}
+                </button>
+              )
+            })}
+          </FilterSection>
+
+          {householdMembers.length > 1 && (
+            <FilterSection title="Pagador">
+              {householdMembers.map((m) => {
+                const active = openPayer === m!.id
+                return (
+                  <button
+                    key={m!.id}
+                    onClick={() => setOpenPayer(active ? null : m!.id)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                    )}
+                  >
+                    <PersonAvatar member={m!} size="xs" />
+                    {m!.id === currentUser?.id ? 'Yo' : m!.name.split(' ')[0]}
+                  </button>
+                )
+              })}
+            </FilterSection>
+          )}
+        </div>
+      </Sheet>
 
       {/* --- add sheet --- */}
       <Sheet

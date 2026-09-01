@@ -14,6 +14,8 @@ import { ProgressBar, SegmentedBar } from '@/components/progress-bar'
 import { CATEGORIES, CATEGORY_LIST, personColorVar } from '@/lib/categories'
 import {
   currentMonthCursor,
+  formatCompact,
+  isSameMonthCursor,
   monthCursorKey,
   monthCursorLabel,
   monthKey,
@@ -74,6 +76,28 @@ export default function ResumenPage() {
     if (prevTotal <= 0) return null
     return ((total - prevTotal) / prevTotal) * 100
   }, [monthFilter, scopedExpenses, total, activeCurrency])
+
+  // --- tendencia: total gastado por mes, últimos 6 meses hasta el mes seleccionado ---
+  const trendEndCursor = monthFilter ?? currentMonthCursor()
+
+  const trendMonths = useMemo(() => {
+    const cursors: MonthCursor[] = []
+    let cursor = trendEndCursor
+    for (let i = 0; i < 6; i++) {
+      cursors.unshift(cursor)
+      cursor = prevMonthCursor(cursor)
+    }
+    return cursors.map((c) => {
+      const key = monthCursorKey(c)
+      const total = scopedExpenses
+        .filter((e) => e.currency === activeCurrency && monthKey(e.date) === key)
+        .reduce((s, e) => s + e.amount, 0)
+      return { cursor: c, key, total }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendEndCursor.year, trendEndCursor.month, scopedExpenses, activeCurrency])
+
+  const maxTrendTotal = Math.max(0, ...trendMonths.map((m) => m.total))
 
   // --- por categoría ---
   const byCategory = useMemo(() => {
@@ -207,6 +231,48 @@ export default function ResumenPage() {
               </p>
             )}
           </div>
+
+          {/* --- tendencia: últimos 6 meses --- */}
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Tendencia
+            </h2>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-end justify-between gap-1.5">
+                {trendMonths.map((m) => {
+                  const isSelected = isSameMonthCursor(m.cursor, trendEndCursor)
+                  const isMax = maxTrendTotal > 0 && m.total === maxTrendTotal
+                  const heightPct =
+                    maxTrendTotal > 0 ? Math.max((m.total / maxTrendTotal) * 100, m.total > 0 ? 6 : 3) : 3
+
+                  return (
+                    <div key={m.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                      <span className="h-3.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                        {isSelected || isMax ? formatCompact(m.total, activeCurrency) : ''}
+                      </span>
+                      <div className="flex h-20 w-full items-end justify-center">
+                        <div
+                          className={cn(
+                            'w-full max-w-8 rounded-t-[4px] transition-all duration-500',
+                            isSelected ? 'bg-primary' : 'bg-muted-foreground/25',
+                          )}
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      </div>
+                      <span
+                        className={cn(
+                          'text-[10px] font-medium capitalize',
+                          isSelected ? 'text-foreground' : 'text-muted-foreground',
+                        )}
+                      >
+                        {monthCursorLabel(m.cursor).slice(0, 3).toLowerCase()}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
 
           {/* --- por categoría --- */}
           <section>

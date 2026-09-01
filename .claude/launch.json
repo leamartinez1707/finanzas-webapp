@@ -3,7 +3,15 @@
   "configurations": [
     {
       "name": "nido-dev",
-      "url": "http://localhost:3000"
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3000
+    },
+    {
+      "name": "nido-prod-test",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["start", "--", "-p", "3001"],
+      "port": 3001
     }
   ]
 }

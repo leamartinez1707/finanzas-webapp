@@ -26,12 +26,17 @@ Mobile-first, pensada para sesiones rápidas: cargar un gasto en 10 segundos, ch
 - **Autenticación** — registro y login con email/password vía Supabase Auth. Perfil con nombre y color personalizado.
 - **Multi-hogar** — creá uno o varios hogares, cada uno con su moneda por defecto. Selector de contexto siempre visible para cambiar entre hogares y vista personal.
 - **Invitaciones** — invitá por email a otras personas. Reciben un link de Resend, aceptan y quedan dentro del hogar.
-- **Gastos compartidos** — cargá gastos del hogar con categoría, monto, fecha y quién pagó. División en partes iguales entre los miembros activos. Balance del mes: quién le debe a quién.
+- **Gastos compartidos** — cargá gastos del hogar con categoría, monto, fecha y quién pagó. División configurable: partes iguales por defecto, un % fijo por hogar, o un ajuste manual gasto por gasto. Balance del mes: quién le debe a quién, con el mínimo de pagos posible.
+- **Gastos recurrentes** — armá una plantilla (alquiler, Internet, gimnasio) y Nido genera el gasto solo cada mes, en el día que definas.
+- **Presupuestos** — poné un tope mensual por categoría. Un indicador visual avisa cuando te acercás (80%) o superás el límite.
 - **Objetivos de ahorro** — del hogar y personales. Con barra de progreso, historial de aportes y moneda editable por objetivo.
 - **Ahorro individual** — cada persona registra depósitos y retiros en su cuenta de ahorro. Transparencia total dentro del hogar.
 - **Finanzas personales** — gastos y objetivos privados, separados de cualquier hogar. Funcionan incluso si no pertenecés a ningún hogar.
 - **Dashboard** — resumen con balance entre miembros, objetivos activos, ahorro combinado. Cambia según el contexto (hogar o personal).
+- **Resumen** — total del mes con variación contra el anterior, desglose por categoría y por persona, y exportación a CSV.
+- **Tendencia** — gráfico de barras con el total gastado en cada uno de los últimos 6 meses (hasta el mes seleccionado), dentro de Resumen.
 - **Historial** — línea de tiempo combinada con filtros por tipo, persona, categoría y fecha.
+- **Novedades** — blog público con las funcionalidades nuevas a medida que se suman.
 - **PWA** — se instala como app nativa en el celular. Funciona offline para consultas, online para escritura.
 
 ## Arquitectura
@@ -60,7 +65,7 @@ Mobile-first, pensada para sesiones rápidas: cargar un gasto en 10 segundos, ch
 
 **Estado:** React Context con un único `AppProvider`. Carga inicial de todos los datos del usuario (hogares, miembros, gastos, objetivos, ahorros). Mutaciones optimistas con rollback implícito vía Supabase.
 
-**Base de datos:** 10 tablas con tipos, constraints, índices y foreign keys con cascade. Migraciones versionadas en `supabase/migrations/`.
+**Base de datos:** 12 tablas con tipos, constraints, índices y foreign keys con cascade. Migraciones versionadas en `supabase/migrations/`.
 
 ## Levantar el proyecto
 
@@ -106,16 +111,19 @@ La migración inicial (`001_schema.sql`) crea todas las tablas, tipos enum, índ
 ```
 finanzas-compartidas/
 ├── app/
+│   ├── novedades/        # Blog público de funcionalidades nuevas
 │   ├── (auth)/           # Rutas públicas: login, onboarding, invitación
 │   │   ├── bienvenida/
 │   │   ├── crear-hogar/
+│   │   ├── ingresar/
 │   │   ├── invitacion/[token]/
 │   │   └── onboarding/
 │   └── (app)/            # Rutas protegidas (requieren sesión)
 │       ├── inicio/       # Dashboard
-│       ├── gastos/       # Listado + alta de gastos
+│       ├── gastos/       # Listado + alta de gastos, recurrentes y presupuestos
 │       ├── objetivos/    # Objetivos de ahorro + detalle
 │       ├── ahorros/      # Cuenta de ahorro individual
+│       ├── resumen/      # Totales, por categoría, por persona, export CSV
 │       ├── ajustes/      # Ajustes del hogar, miembros, invitaciones
 │       └── historial/    # Línea de tiempo con filtros
 ├── components/           # Componentes reutilizables (22)
@@ -149,18 +157,16 @@ finanzas-compartidas/
 - **Sin server components pesados:** la app depende del cliente de Supabase para datos en tiempo real. Los server components se usan solo para metadata y SEO.
 - **Context API sobre Zustand/Redux:** el estado es simple (datos de un solo usuario + sus hogares). No justifica una librería externa.
 - **RLS como única capa de autorización:** no hay lógica de permisos en el frontend. Si Supabase no te devuelve una fila, no la ves. Punto.
-- **División de gastos 1/N:** la regla más simple y justa. En el roadmap queda la división configurable por porcentaje o por gasto.
+- **División de gastos configurable:** 1/N por defecto (la regla más simple y justa), con un % fijo opcional por hogar (`households.default_split`) que se congela en cada gasto al crearlo (`splitSnapshot`), y un override manual por gasto individual (`shares`). Los gastos viejos nunca cambian de balance porque no releen la config actual del hogar.
 - **Multi-moneda sin conversión automática:** cada objetivo y gasto guarda su propia moneda. Los totales se muestran por moneda. La conversión automática es un feature complejo que va para v2.
 
 ## Roadmap
 
 - [ ] Conversión automática entre monedas (API de cotizaciones)
-- [ ] División de gastos configurable (porcentaje, por persona)
 - [ ] Roles y permisos dentro del hogar
 - [ ] Notificaciones push
-- [ ] Exportar a Excel / PDF
-- [ ] Gastos recurrentes automáticos
-- [ ] Gráficos de tendencias por categoría
+- [ ] Exportar a Excel / PDF (hoy: CSV desde Resumen)
+- [ ] Gráficos de tendencia por categoría a lo largo de varios meses (hoy la tendencia es solo del total, no discriminada por categoría)
 
 ## Sobre mí
 

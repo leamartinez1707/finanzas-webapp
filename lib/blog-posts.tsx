@@ -14,6 +14,42 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'tendencia-de-gastos',
+    title: 'Cómo viene la mano, mes a mes',
+    excerpt:
+      'Un gráfico con los últimos 6 meses de gasto total, para ver de un vistazo si vas para arriba o para abajo.',
+    date: '2026-09-01',
+    content: (
+      <>
+        <p key="p1">
+          El Resumen te decía cuánto gastaste este mes y cómo quedó contra el
+          anterior, pero ahí se cortaba: un solo número, un solo porcentaje.
+          Para saber si veníamos gastando de más hacía dos o tres meses,
+          había que ir mes por mes a mano.
+        </p>
+        <p key="p2">
+          Ahora hay un gráfico de barras nuevo, arriba de todo en Resumen:
+          Tendencia. Muestra el total gastado en cada uno de los últimos 6
+          meses, terminando en el mes que tengas seleccionado. La barra del
+          mes actual se destaca del resto, así siempre sabés dónde estás
+          parado dentro del panorama completo.
+        </p>
+        <p key="p3">
+          Se mueve junto con el resto de la pantalla: si navegás a un mes
+          anterior, el gráfico recalcula los 6 meses terminando ahí. Y si
+          preferís ver todo el historial, toma como referencia el mes
+          actual.
+        </p>
+        <p key="p4">
+          Es el mismo total que ya calculábamos para el resto de Resumen —
+          por moneda, respetando si estás en modo hogar o personal — nada
+          más que ahora lo ves evolucionar en el tiempo, no solo como una
+          foto de un mes puntual.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'resumen-mensual-y-exportar-csv',
     title: 'Un resumen de en qué se fue la plata',
     excerpt:

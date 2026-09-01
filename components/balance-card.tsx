@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, HandCoins, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowRight, HandCoins, History, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { computeBalances, computeSettlements } from '@/lib/balance'
 import { Money } from '@/components/money'
@@ -9,7 +9,7 @@ import { MonthNav } from '@/components/month-nav'
 import { PersonAvatar } from '@/components/person-avatar'
 import { RepaymentForm } from '@/components/repayment-form'
 import { Sheet } from '@/components/sheet'
-import { currentMonthCursor, isSameMonthCursor } from '@/lib/format'
+import { currentMonthCursor, isSameMonthCursor, prevMonthCursor } from '@/lib/format'
 import { showError, showSuccess } from '@/lib/toast'
 import type { Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,16 @@ export function BalanceCard() {
   const settled = Math.abs(myNet) < 0.01
   const isCurrentMonth = isSameMonthCursor(selectedMonth, currentMonth)
 
+  // Fixed to the real previous calendar month (not relative to selectedMonth)
+  // — a subtle reminder on the home screen that last month's balance is
+  // still open, independent of whichever month the card happens to be
+  // showing. Only surfaced while looking at the current month, so it
+  // doesn't compound into "anterior a lo anterior" confusion when paging back.
+  const prevMonth = prevMonthCursor(currentMonth)
+  const prevNet = computeBalances(householdMembers, householdExpenses, householdRepayments, prevMonth)
+    .balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
+  const showPrevBalance = isCurrentMonth && Math.abs(prevNet) >= 0.01
+
   async function save(data: Omit<Repayment, 'id' | 'createdById'>) {
     try { await addRepayment(data); showSuccess('Pago registrado.'); setAdding(false) } catch (error) { showError(error) }
   }
@@ -63,6 +73,16 @@ export function BalanceCard() {
       </div>
       <Money amount={Math.abs(myNet)} currency={activeHousehold.currency} className={cn('mt-3 block text-[44px] text-center leading-none', settled ? 'text-foreground' : myNet > 0 ? 'text-positive' : 'text-destructive')} />
       <p className="mt-2 text-sm text-pretty text-muted-foreground">{settled ? 'No hay saldo pendiente este mes en esta moneda.' : myNet > 0 ? 'Es lo que el resto del hogar te debe este mes.' : 'Es lo que le debés al resto del hogar este mes.'}</p>
+      {showPrevBalance && (
+        <button
+          onClick={() => setSelectedMonth(prevMonth)}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <History className="size-3.5" />
+          Saldo anterior: {prevNet > 0 ? 'te debían' : 'debías'}{' '}
+          <Money amount={Math.abs(prevNet)} currency={activeHousehold.currency} className="font-semibold text-foreground" />
+        </button>
+      )}
       <button onClick={() => setAdding(true)} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 font-semibold text-primary-foreground"><Plus className="size-4" />Registrar pago</button>
       {settlements.length > 0 && <ul className="mt-5 flex flex-col gap-2">{settlements.map((s, i) => { const from = getMember(s.fromId); const to = getMember(s.toId); if (!from || !to) return null; return <li key={i} className="flex items-center gap-3 rounded-2xl bg-secondary/60 px-3 py-2.5"><PersonAvatar member={from} size="sm" /><ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden /><PersonAvatar member={to} size="sm" /><span className="ml-1 min-w-0 truncate text-sm"><b>{from.name}</b> le paga a <b>{to.name}</b></span><Money amount={s.amount} currency={s.currency} className="ml-auto text-sm font-semibold" /></li> })}</ul>}
       <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">Gasto compartido {isCurrentMonth ? 'este mes' : 'del mes'} en {activeHousehold.currency}: <Money amount={activeExpensesTotal} currency={activeHousehold.currency} className="text-xs font-semibold text-foreground" /></p>
