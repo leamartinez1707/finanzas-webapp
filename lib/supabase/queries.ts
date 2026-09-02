@@ -1,6 +1,6 @@
 import { createClient } from './client'
 import { todayLocalISO } from '../format'
-import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent } from '../types'
+import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent, PremiumFeatureId, PremiumWaitlistEntry } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -116,6 +116,14 @@ function toSavings(row: any): SavingsMovement {
     date: row.fecha,
     createdAt: row.creado_en ?? undefined,
     note: row.nota ?? undefined,
+  }
+}
+
+function toPremiumWaitlistEntry(row: any): PremiumWaitlistEntry {
+  return {
+    userId: row.user_id,
+    interestedFeatures: (row.interested_features ?? []) as PremiumFeatureId[],
+    joinedAt: row.created_at,
   }
 }
 
@@ -599,6 +607,73 @@ export async function deleteBudget(id: string) {
   const { data, error } = await s.from('budgets').delete().eq('id', id).select('id')
   if (!error && !data?.length) throw new Error('No se pudo eliminar el presupuesto (sin permiso o ya no existe).')
   if (error) throw error
+}
+
+// ─── Premium waitlist ─────────────────────────────────────────────
+
+export async function getPremiumWaitlistEntry(): Promise<PremiumWaitlistEntry | null> {
+  const s = supabase()
+  const { data: { user }, error: userError } = await s.auth.getUser()
+  if (userError) {
+    // Same "no session at all" as getCurrentUser() — normal, not an error.
+    if (userError.name === 'AuthSessionMissingError') return null
+    throw userError
+  }
+  if (!user) return null
+
+  const { data, error } = await s
+    .from('premium_waitlist')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+  return toPremiumWaitlistEntry(data)
+}
+
+export async function joinPremiumWaitlist(features: PremiumFeatureId[]): Promise<PremiumWaitlistEntry> {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await s
+    .from('premium_waitlist')
+    .upsert(
+      { user_id: user.id, interested_features: features },
+      { onConflict: 'user_id' },
+    )
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return toPremiumWaitlistEntry(data)
+}
+
+export async function updatePremiumWaitlistFeatures(features: PremiumFeatureId[]) {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { error } = await s
+    .from('premium_waitlist')
+    .update({ interested_features: features })
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
+export async function leavePremiumWaitlist() {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await s
+    .from('premium_waitlist')
+    .delete()
+    .eq('user_id', user.id)
+    .select('user_id')
+  if (error) throw error
+  if (!data?.length) throw new Error('No se pudo salir de la lista de espera.')
 }
 
 export async function getRepayments(householdId: string): Promise<Repayment[]> {

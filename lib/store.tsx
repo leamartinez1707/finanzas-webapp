@@ -10,7 +10,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { Budget, CurrencyCode, Expense, Goal, Household, Member, RecurringExpense, Repayment, SavingsMovement } from './types'
+import type { Budget, CurrencyCode, Expense, Goal, Household, Member, PremiumFeatureId, PremiumWaitlistEntry, RecurringExpense, Repayment, SavingsMovement } from './types'
 import {
   getCurrentUser,
   getMyHouseholds,
@@ -31,6 +31,10 @@ import {
   addBudget as addBudgetDB,
   updateBudget as updateBudgetDB,
   deleteBudget as deleteBudgetDB,
+  getPremiumWaitlistEntry,
+  joinPremiumWaitlist as joinPremiumWaitlistDB,
+  updatePremiumWaitlistFeatures as updatePremiumWaitlistFeaturesDB,
+  leavePremiumWaitlist as leavePremiumWaitlistDB,
   addRepayment as addRepaymentDB,
   updateRepayment as updateRepaymentDB,
   deleteRepayment as deleteRepaymentDB,
@@ -70,6 +74,7 @@ interface AppState {
   goals: Goal[]
   savings: SavingsMovement[]
   repayments: Repayment[]
+  premiumWaitlistEntry: PremiumWaitlistEntry | null
   selectedContext: string
   setSelectedContext: (id: string) => void
 
@@ -90,6 +95,9 @@ interface AppState {
   addBudget: (b: Omit<Budget, 'id' | 'createdById'>) => Promise<void>
   updateBudget: (id: string, patch: Partial<Budget>) => Promise<void>
   deleteBudget: (id: string) => Promise<void>
+  joinPremiumWaitlist: (features: PremiumFeatureId[]) => Promise<void>
+  updatePremiumWaitlistFeatures: (features: PremiumFeatureId[]) => Promise<void>
+  leavePremiumWaitlist: () => Promise<void>
   addRepayment: (r: Omit<Repayment, 'id' | 'createdById'>) => Promise<void>
   updateRepayment: (id: string, patch: Partial<Repayment>) => Promise<void>
   deleteRepayment: (id: string) => Promise<void>
@@ -130,6 +138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [repayments, setRepayments] = useState<Repayment[]>([])
+  const [premiumWaitlistEntry, setPremiumWaitlistEntry] = useState<PremiumWaitlistEntry | null>(null)
   const [selectedContext, setSelectedContext] = useState<string>('personal')
   const [busy, setBusy] = useState(false)
   const defaultContextAppliedRef = useRef(false)
@@ -211,7 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // of one giant sequential chain, so a single slow/failing request
       // doesn't stretch out the window where a mid-flight token refresh
       // can take the whole load down.
-      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalGoals, personalSavings, perHousehold] =
+      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalGoals, personalSavings, waitlistEntry, perHousehold] =
         await Promise.all([
           getAllMembers([...allMemberIds]),
           getExpenses(personalFilter),
@@ -219,6 +228,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           getBudgets(personalFilter),
           getGoals(personalFilter),
           getSavings(personalFilter, [user.id]),
+          getPremiumWaitlistEntry(),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
@@ -275,6 +285,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
+      setPremiumWaitlistEntry(waitlistEntry)
       if (!silent) setLoading(false)
     } catch (error) {
       if (!silent) setLoading(false)
@@ -323,6 +334,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       goals,
       savings,
       repayments,
+      premiumWaitlistEntry,
       selectedContext,
       setSelectedContext,
       currentUser,
@@ -374,6 +386,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteBudget: wrapBusy(async (id) => {
         await deleteBudgetDB(id)
         setBudgets((prev) => prev.filter((b) => b.id !== id))
+      }),
+      joinPremiumWaitlist: wrapBusy(async (features) => {
+        const entry = await joinPremiumWaitlistDB(features)
+        setPremiumWaitlistEntry(entry)
+      }),
+      updatePremiumWaitlistFeatures: wrapBusy(async (features) => {
+        await updatePremiumWaitlistFeaturesDB(features)
+        setPremiumWaitlistEntry((prev) => (prev ? { ...prev, interestedFeatures: features } : prev))
+      }),
+      leavePremiumWaitlist: wrapBusy(async () => {
+        await leavePremiumWaitlistDB()
+        setPremiumWaitlistEntry(null)
       }),
       addRepayment: wrapBusy(async (r) => {
         const created = await addRepaymentDB(r)
@@ -522,6 +546,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     goals,
     savings,
     repayments,
+    premiumWaitlistEntry,
     selectedContext,
     loadData,
     wrapBusy,

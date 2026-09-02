@@ -14,6 +14,78 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'instalar-nido-como-app',
+    title: 'Instalá Nido como una app en tu celular',
+    excerpt:
+      'Sin App Store ni Play Store: agregá Nido a la pantalla de inicio de tu iPhone o Android y usala como una app más.',
+    date: '2026-09-02',
+    content: (
+      <>
+        <p key="p1">
+          Nido funciona como una PWA (Progressive Web App), que es una forma
+          elegante de decir que podés instalarla directo desde el navegador,
+          sin pasar por ninguna tienda de aplicaciones. Queda con su ícono en
+          tu pantalla de inicio, abre a pantalla completa como cualquier app
+          nativa, y podés consultar tus datos aunque te quedes sin señal por
+          un rato — para cargar o editar algo sí necesitás conexión.
+        </p>
+        <p key="p2">
+          La instalación se hace distinto según el celular. Acá van los dos
+          caminos.
+        </p>
+
+        <h2 key="h2-ios" className="text-lg font-bold tracking-tight text-foreground">
+          En iPhone o iPad (Safari)
+        </h2>
+        <p key="p3-ios" className="text-sm text-muted-foreground">
+          Tiene que ser desde Safari — en iOS es el único navegador que puede
+          instalar apps a la pantalla de inicio, aunque tengas Chrome
+          instalado.
+        </p>
+        <ol key="ol-ios" className="list-decimal space-y-2 pl-5">
+          <li>
+            Entrá a{' '}
+            <a
+              href="https://finanzas-nido.vercel.app"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              finanzas-nido.vercel.app
+            </a>{' '}
+            desde Safari.
+          </li>
+          <li>Tocá el ícono de compartir (el cuadrado con la flecha hacia arriba).</li>
+          <li>Deslizá la lista de opciones y elegí <strong>Agregar a inicio</strong>.</li>
+          <li>Confirmá tocando <strong>Agregar</strong> arriba a la derecha.</li>
+        </ol>
+
+        <h2 key="h2-android" className="text-lg font-bold tracking-tight text-foreground">
+          En Android (Chrome)
+        </h2>
+        <ol key="ol-android" className="list-decimal space-y-2 pl-5">
+          <li>
+            Entrá a{' '}
+            <a
+              href="https://finanzas-nido.vercel.app"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              finanzas-nido.vercel.app
+            </a>{' '}
+            desde Chrome.
+          </li>
+          <li>Tocá los tres puntos, arriba a la derecha.</li>
+          <li>Elegí <strong>Instalar app</strong> (o <strong>Agregar a pantalla de inicio</strong>, según la versión).</li>
+          <li>Confirmá. A veces Chrome te muestra directamente un cartel de &ldquo;Instalar&rdquo; abajo de la pantalla — con tocarlo alcanza.</li>
+        </ol>
+
+        <p key="p4">
+          Una vez instalada, Nido se comporta como cualquier otra app: la
+          buscás por su ícono, abre sin la barra del navegador, y queda
+          disponible aunque estés sin datos para ver lo que ya cargaste.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'tendencia-de-gastos',
     title: 'Cómo viene la mano, mes a mes',
     excerpt:
@@ -237,6 +309,10 @@ const MONTHS_LONG = [
 ]
 
 export function formatPostDate(iso: string) {
-  const d = new Date(iso)
-  return `${d.getDate()} de ${MONTHS_LONG[d.getMonth()]} de ${d.getFullYear()}`
+  // Parse the Y-M-D literally instead of via `new Date(iso)` — that parses
+  // as UTC midnight, which rolls back to the previous day once converted to
+  // any UTC-negative local time (e.g. Uruguay, UTC-3), showing every post
+  // one day earlier than its actual `date`.
+  const [year, month, day] = iso.split('-').map(Number)
+  return `${day} de ${MONTHS_LONG[month - 1]} de ${year}`
 }

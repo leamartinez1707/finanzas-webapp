@@ -87,6 +87,18 @@ export interface Budget {
   createdById: string
 }
 
+export type PremiumFeatureId =
+  | 'conversion_moneda'
+  | 'exportar_excel_pdf'
+  | 'notificaciones_presupuesto'
+  | 'tendencia_categoria'
+
+export interface PremiumWaitlistEntry {
+  userId: string
+  interestedFeatures: PremiumFeatureId[]
+  joinedAt: string // ISO date
+}
+
 export interface Repayment {
   id: string
   householdId: string

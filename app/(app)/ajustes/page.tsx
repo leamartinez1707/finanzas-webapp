@@ -21,6 +21,7 @@ import { CurrencySelect } from '@/components/currency-select'
 import { Field, inputClass } from '@/components/field'
 import { Sheet } from '@/components/sheet'
 import { PersonAvatar } from '@/components/person-avatar'
+import { PremiumWaitlistCard } from '@/components/premium-waitlist-card'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { CurrencyCode, Household, Member, SplitPercent } from '@/lib/types'
@@ -55,6 +56,7 @@ export default function AjustesPage() {
     return (
       <div className="space-y-5">
         <ScreenHeader title="Ajustes" />
+        <PremiumWaitlistCard />
         <div className="rounded-3xl border border-dashed border-border bg-card/60 p-8 text-center">
           <span className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
             <Settings2 className="size-6" />
@@ -138,6 +140,8 @@ export default function AjustesPage() {
   return (
     <div className="space-y-4">
       <ScreenHeader title="Ajustes" subtitle={activeHousehold.name} />
+
+      <PremiumWaitlistCard />
 
       {/* --- household info --- */}
       <section>
