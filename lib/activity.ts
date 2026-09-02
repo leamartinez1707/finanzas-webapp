@@ -8,6 +8,7 @@ import type {
   Repayment,
 } from './types'
 import { CATEGORIES } from './categories'
+import { parseLocalDate } from './format'
 
 interface BuildArgs {
   expenses: Expense[]
@@ -44,6 +45,7 @@ export function buildActivity(
       amount: e.amount,
       currency: e.currency,
       date: e.date,
+      createdAt: e.createdAt,
       category: e.category,
       direction: 'out',
     })
@@ -65,6 +67,7 @@ export function buildActivity(
         amount: c.amount,
         currency: g.currency,
         date: c.date,
+        createdAt: c.createdAt,
         direction: 'in',
       })
     }
@@ -85,6 +88,7 @@ export function buildActivity(
       amount: s.amount,
       currency: baseCurrency,
       date: s.date,
+      createdAt: s.createdAt,
       direction: s.type === 'deposito' ? 'in' : 'out',
     })
   }
@@ -100,10 +104,11 @@ export function buildActivity(
         amount: r.amount,
         currency: r.currency,
         date: r.date,
+        createdAt: r.createdAt,
         direction: 'out',
       })
     }
   }
 
-  return items.sort((a, b) => +new Date(b.date) - +new Date(a.date))
+  return items.sort((a, b) => +parseLocalDate(b.date) - +parseLocalDate(a.date))
 }

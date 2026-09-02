@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Send, RotateCw, X, Clock, CircleCheck, TriangleAlert } from 'lucide-react'
+import { Mail, Send, RotateCw, X, Clock, CircleCheck, TriangleAlert, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { inputClass } from '@/components/field'
 import { cn } from '@/lib/utils'
@@ -19,7 +19,7 @@ const STATUS_META: Record<
 }
 
 export function InviteManager({ householdId }: { householdId: string }) {
-  const { getHousehold, addInvite, updateInvite, removeInvite } = useApp()
+  const { getHousehold, addInvite, updateInvite, removeInvite, busy } = useApp()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const household = getHousehold(householdId)
@@ -76,10 +76,20 @@ export function InviteManager({ householdId }: { householdId: string }) {
         </div>
         <button
           type="submit"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-primary px-4 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+          disabled={busy}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-primary px-4 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Send className="size-4" />
-          Invitar
+          {busy ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>
+              <Send className="size-4" />
+              Invitar
+            </>
+          )}
         </button>
       </form>
       {error && (
@@ -119,17 +129,19 @@ export function InviteManager({ householdId }: { householdId: string }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleResend(inv.id)}
+                        disabled={busy}
                         aria-label="Reenviar invitación"
-                        className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <RotateCw className="size-4" />
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
                       </button>
                       <button
                         onClick={() => handleRemove(inv.id)}
+                        disabled={busy}
                         aria-label="Cancelar invitación"
-                        className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <X className="size-4" />
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
                       </button>
                     </div>
                   )}

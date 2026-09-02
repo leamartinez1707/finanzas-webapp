@@ -59,9 +59,8 @@ export function ActivityRow({
           <p className="truncate font-medium">{item.title}</p>
           <CurrencyTag currency={item.currency} base={baseCurrency} />
         </div>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {item.subtitle} · {formatRelative(item.date)}
-        </p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">{formatRelative(item.date, item.createdAt)}</p>
       </div>
 
       <div className="flex items-center gap-2.5">

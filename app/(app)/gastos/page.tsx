@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, ListFilter, ReceiptText, Wallet } from 'lucide-react'
+import { Loader2, Plus, ListFilter, ReceiptText, Wallet } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { ScreenHeader } from '@/components/screen-header'
@@ -17,7 +17,7 @@ import { Sheet } from '@/components/sheet'
 import { FilterTrigger, ActiveFilterPills, FilterSection } from '@/components/filter-sheet'
 import { MonthNav } from '@/components/month-nav'
 import { ProgressBar } from '@/components/progress-bar'
-import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, type MonthCursor } from '@/lib/format'
+import { currentMonthCursor, monthCursorKey, monthKey, monthLabel, parseLocalDate, type MonthCursor } from '@/lib/format'
 import { sumByCurrency } from '@/lib/balance'
 import { cn } from '@/lib/utils'
 import type { CategoryId, CurrencyCode, Expense, RecurringExpense } from '@/lib/types'
@@ -35,6 +35,7 @@ export default function GastosPage() {
     budgets,
     repayments,
     loading,
+    busy,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -95,7 +96,7 @@ export default function GastosPage() {
     if (openPayer) list = list.filter((e) => e.payerId === openPayer)
     if (monthFilter) list = list.filter((e) => monthKey(e.date) === monthCursorKey(monthFilter))
 
-    return [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return [...list].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }, [expenses, isPersonal, currentUser?.id, activeHousehold, openCategory, openPayer, monthFilter])
 
   const totalsByCurrency = useMemo(() => sumByCurrency(scopedExpenses), [scopedExpenses])
@@ -650,9 +651,15 @@ export default function GastosPage() {
           <button
             type="button"
             onClick={handleSaveBudgets}
-            className="w-full rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+            disabled={busy}
+            className="w-full rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Guardar
+            {busy ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                Guardando...
+              </span>
+            ) : 'Guardar'}
           </button>
         </div>
       </Sheet>

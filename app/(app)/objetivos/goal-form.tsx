@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { Field, inputClass } from '@/components/field'
 import { CurrencySelect } from '@/components/currency-select'
@@ -15,7 +16,7 @@ export function GoalForm({
   onSubmit: (data: Omit<Goal, 'id' | 'contributions'>) => void | Promise<void>
   onCancel?: () => void
 }) {
-  const { isPersonal, activeHousehold, currentUser, activeCurrency } = useApp()
+  const { isPersonal, activeHousehold, currentUser, activeCurrency, busy } = useApp()
 
   const [name, setName] = useState(initial?.name ?? '')
   const [target, setTarget] = useState(initial ? String(initial.target) : '')
@@ -99,16 +100,23 @@ export function GoalForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+            disabled={busy}
+            className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
             Cancelar
           </button>
         )}
         <button
           type="submit"
-          className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+          disabled={busy}
+          className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {initial ? 'Guardar cambios' : 'Crear objetivo'}
+          {busy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              {initial ? 'Guardando...' : 'Creando...'}
+            </span>
+          ) : initial ? 'Guardar cambios' : 'Crear objetivo'}
         </button>
       </div>
     </form>

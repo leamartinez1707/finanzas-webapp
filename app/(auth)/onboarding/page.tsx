@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ArrowRight } from 'lucide-react'
+import { Check, ArrowRight, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { PERSON_COLORS } from '@/lib/categories'
 import { Field, inputClass } from '@/components/field'
@@ -13,7 +13,7 @@ import { showError, showSuccess } from '@/lib/toast'
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { updateProfile } = useApp()
+  const { updateProfile, busy } = useApp()
   const [name, setName] = useState('')
   const [color, setColor] = useState<PersonColor>('person-1')
 
@@ -87,10 +87,20 @@ export default function OnboardingPage() {
 
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Continuar
-          <ArrowRight className="size-4.5" />
+          {busy ? (
+            <>
+              <Loader2 className="size-4.5 animate-spin" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              Continuar
+              <ArrowRight className="size-4.5" />
+            </>
+          )}
         </button>
       </form>
     </div>

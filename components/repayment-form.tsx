@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
-import { expenseShare } from '@/lib/balance'
+import { expenseShare, unsettledExpenseIds } from '@/lib/balance'
 import { CurrencySelect } from '@/components/currency-select'
 import { Field, inputClass } from '@/components/field'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
+import { todayLocalISO } from '@/lib/format'
 import type { CurrencyCode, Member, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -20,21 +21,31 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
   onCancel?: () => void
   onDelete?: () => void
 }) {
-  const { activeHousehold, activeCurrency, members, expenses, currentUser } = useApp()
+  const { activeHousehold, activeCurrency, members, expenses, repayments, currentUser, busy } = useApp()
   const householdMembers = activeHousehold?.memberIds.map((id) => members.find((m) => m.id === id)).filter(Boolean) ?? []
   const householdExpenses = expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold?.id)
+  const householdRepayments = repayments.filter((r) => r.householdId === activeHousehold?.id)
   const [fromId, setFromId] = useState(initial?.fromId ?? prefill?.fromId ?? currentUser?.id ?? '')
   const [toId, setToId] = useState(initial?.toId ?? prefill?.toId ?? householdMembers.find((m) => m?.id !== fromId)?.id ?? '')
   const [amount, setAmount] = useState(initial ? String(initial.amount) : prefill?.amount ? String(prefill.amount) : '')
   const [currency, setCurrency] = useState<CurrencyCode>(initial?.currency ?? prefill?.currency ?? activeCurrency)
-  const [date, setDate] = useState(initial?.date ?? prefill?.date ?? new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(initial?.date ?? prefill?.date ?? todayLocalISO())
   const [expenseId, setExpenseId] = useState(initial?.expenseId ?? prefill?.expenseId ?? '')
   const [note, setNote] = useState(initial?.note ?? '')
   const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [expenseSearch, setExpenseSearch] = useState('')
   const [expenseOpen, setExpenseOpen] = useState(false)
-  const compatibleExpenses = householdExpenses.filter((e) => e.currency === currency)
+  // Solo gastos de `toId` que `fromId` todavía no terminó de pagarle — el
+  // buscador no arrastra para siempre gastos ya saldados. La única excepción
+  // es el gasto que este pago ya tenía asociado al editar: ese se mantiene
+  // visible aunque la cuenta ya lo dé por cubierto, para no perder la
+  // selección de abajo del usuario.
+  const unsettledIds = fromId && toId
+    ? unsettledExpenseIds(householdExpenses, householdRepayments, fromId, toId, currency, householdMembers.length)
+    : new Set<string>()
+  const compatibleExpenses = householdExpenses.filter((e) =>
+    e.currency === currency && (unsettledIds.has(e.id) || e.id === initial?.expenseId),
+  )
 
   const filteredExpenses = useMemo(() => {
     if (!expenseSearch.trim()) return compatibleExpenses
@@ -48,21 +59,16 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
     if (expenseId && !compatibleExpenses.some((expense) => expense.id === expenseId)) {
       setExpenseId('')
     }
-  }, [currency])
+  }, [currency, fromId, toId])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (submitting) return
+    if (busy) return
     const value = Number(amount)
     if (!activeHousehold || !fromId || !toId || !householdMembers.some((m) => m?.id === fromId) || !householdMembers.some((m) => m?.id === toId)) return setError('Elegí dos personas del hogar')
     if (fromId === toId) return setError('El pagador y el receptor deben ser distintos')
     if (!Number.isFinite(value) || value <= 0) return setError('Ingresá un monto válido')
-    setSubmitting(true)
-    try {
-      await onSubmit({ householdId: activeHousehold.id, fromId, toId, amount: value, currency, date, expenseId: expenseId || (initial ? null : undefined), note: note.trim() || undefined })
-    } finally {
-      setSubmitting(false)
-    }
+    await onSubmit({ householdId: activeHousehold.id, fromId, toId, amount: value, currency, date, expenseId: expenseId || (initial ? null : undefined), note: note.trim() || undefined })
   }
 
   return <form onSubmit={submit} className="space-y-4">
@@ -127,11 +133,14 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
       {expenseOpen && hasMoreExpenses && (
         <p className="text-xs text-muted-foreground">Hay más gastos — escribí para buscar.</p>
       )}
+      {expenseOpen && compatibleExpenses.length === 0 && (
+        <p className="text-xs text-muted-foreground">No hay gastos pendientes entre estas dos personas en esta moneda.</p>
+      )}
     </div>
     <Field label="Nota" htmlFor="repayment-note" hint="Opcional"><input id="repayment-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: transferencia" className={inputClass} /></Field>
     {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-    <div className="flex gap-2 pt-1">{onCancel && <button type="button" onClick={onCancel} className="flex-1 rounded-2xl border border-border py-3.5 font-semibold">Cancelar</button>}<button type="submit" disabled={submitting} className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Guardando...' : initial ? 'Guardar cambios' : 'Registrar pago'}</button></div>
-    {initial && onDelete && <button type="button" onClick={onDelete} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive"><Trash2 className="size-4" />Eliminar pago</button>}
+    <div className="flex gap-2 pt-1">{onCancel && <button type="button" onClick={onCancel} disabled={busy} className="flex-1 rounded-2xl border border-border py-3.5 font-semibold disabled:cursor-not-allowed disabled:opacity-60">Cancelar</button>}<button type="submit" disabled={busy} className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">{busy ? <span className="inline-flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" />Guardando...</span> : initial ? 'Guardar cambios' : 'Registrar pago'}</button></div>
+    {initial && onDelete && <button type="button" onClick={onDelete} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive disabled:cursor-not-allowed disabled:opacity-60">{busy ? <><Loader2 className="size-4 animate-spin" />Eliminando...</> : <><Trash2 className="size-4" />Eliminar pago</>}</button>}
   </form>
 }
 

@@ -1,4 +1,5 @@
 import { createClient } from './client'
+import { todayLocalISO } from '../format'
 import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ function toExpense(row: any): Expense {
     amount: Number(row.monto),
     currency: row.moneda as CurrencyCode,
     date: row.fecha,
+    createdAt: row.creado_en ?? undefined,
     recurringExpenseId: row.recurring_expense_id ?? undefined,
     shares: row.shares ?? undefined,
     splitSnapshot: row.split_snapshot ?? undefined,
@@ -71,6 +73,7 @@ function toContribution(row: any): Contribution {
     memberId: row.user_id,
     amount: Number(row.monto),
     date: row.fecha,
+    createdAt: row.creado_en ?? undefined,
   }
 }
 
@@ -111,6 +114,7 @@ function toSavings(row: any): SavingsMovement {
     type: row.tipo as 'deposito' | 'retiro',
     amount: Number(row.monto),
     date: row.fecha,
+    createdAt: row.creado_en ?? undefined,
     note: row.nota ?? undefined,
   }
 }
@@ -124,6 +128,7 @@ function toRepayment(row: any): Repayment {
     amount: Number(row.amount),
     currency: row.currency as CurrencyCode,
     date: row.date,
+    createdAt: row.created_at ?? undefined,
     note: row.note ?? undefined,
     expenseId: row.expense_id ?? undefined,
     createdById: row.created_by,
@@ -429,8 +434,9 @@ export async function updateExpense(id: string, patch: Partial<Expense>) {
 
 export async function deleteExpense(id: string) {
   const s = supabase()
-  const { error } = await s.from('expenses').delete().eq('id', id)
+  const { data, error } = await s.from('expenses').delete().eq('id', id).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('No se pudo eliminar el gasto (sin permiso o ya no existe).')
 }
 
 // ─── Recurring expenses ─────────────────────────────────────────────
@@ -496,7 +502,8 @@ export async function updateRecurringExpense(id: string, patch: Partial<Recurrin
 
 export async function deleteRecurringExpense(id: string) {
   const s = supabase()
-  const { error } = await s.from('recurring_expenses').delete().eq('id', id)
+  const { data, error } = await s.from('recurring_expenses').delete().eq('id', id).select('id')
+  if (!error && !data?.length) throw new Error('No se pudo eliminar el gasto recurrente (sin permiso o ya no existe).')
   if (error) throw error
 }
 
@@ -589,7 +596,8 @@ export async function updateBudget(id: string, patch: Partial<Budget>) {
 
 export async function deleteBudget(id: string) {
   const s = supabase()
-  const { error } = await s.from('budgets').delete().eq('id', id)
+  const { data, error } = await s.from('budgets').delete().eq('id', id).select('id')
+  if (!error && !data?.length) throw new Error('No se pudo eliminar el presupuesto (sin permiso o ya no existe).')
   if (error) throw error
 }
 
@@ -742,16 +750,18 @@ export async function deleteGoal(id: string) {
   const s = supabase()
   const { error: contributionsError } = await s.from('goal_contributions').delete().eq('goal_id', id)
   if (contributionsError) throw contributionsError
-  const { error } = await s.from('goals').delete().eq('id', id)
+  const { data, error } = await s.from('goals').delete().eq('id', id).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('No se pudo eliminar el objetivo (sin permiso o ya no existe).')
 }
 
-export async function addContribution(goalId: string, userId: string, amount: number): Promise<Contribution> {
+export async function addContribution(goalId: string, userId: string, amount: number, date: string = todayLocalISO()): Promise<Contribution> {
   const s = supabase()
   const { data, error } = await s.from('goal_contributions').insert({
     goal_id: goalId,
     user_id: userId,
     monto: amount,
+    fecha: date,
   }).select('*').single()
   if (error) throw error
   return toContribution(data)
@@ -759,7 +769,8 @@ export async function addContribution(goalId: string, userId: string, amount: nu
 
 export async function deleteContribution(id: string) {
   const s = supabase()
-  const { error } = await s.from('goal_contributions').delete().eq('id', id)
+  const { data, error } = await s.from('goal_contributions').delete().eq('id', id).select('id')
+  if (!error && !data?.length) throw new Error('No se pudo eliminar el aporte (sin permiso o ya no existe).')
   if (error) throw error
 }
 
@@ -815,7 +826,8 @@ export async function updateSavingsMovement(id: string, patch: Partial<SavingsMo
 
 export async function deleteSavingsMovement(id: string) {
   const s = supabase()
-  const { error } = await s.from('savings_movements').delete().eq('id', id)
+  const { data, error } = await s.from('savings_movements').delete().eq('id', id).select('id')
+  if (!error && !data?.length) throw new Error('No se pudo eliminar el movimiento (sin permiso o ya no existe).')
   if (error) throw error
 }
 
@@ -928,8 +940,9 @@ export async function updateInvite(householdId: string, inviteId: string, status
 
 export async function removeInvite(inviteId: string) {
   const s = supabase()
-  const { error } = await s.from('household_invites').delete().eq('id', inviteId)
+  const { data, error } = await s.from('household_invites').delete().eq('id', inviteId).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('No se pudo eliminar la invitación (sin permiso o ya no existe).')
 }
 
 export async function getMyPendingInvites(): Promise<any[]> {

@@ -19,6 +19,7 @@ import {
   monthCursorKey,
   monthCursorLabel,
   monthKey,
+  parseLocalDate,
   prevMonthCursor,
   type MonthCursor,
 } from '@/lib/format'
@@ -53,7 +54,7 @@ export default function ResumenPage() {
       ? expenses.filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id)
       : expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold?.id)
 
-    return [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return [...list].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }, [expenses, isPersonal, currentUser?.id, activeHousehold])
 
   const filteredExpenses = useMemo(() => {
@@ -151,7 +152,7 @@ export default function ResumenPage() {
     const header = 'Fecha,Descripcion,Categoria,Monto,Moneda,Pagador'
     const rows = filteredExpenses.map((e) => {
       const payer = members.find((m) => m.id === e.payerId)
-      const fecha = new Date(e.date).toISOString().slice(0, 10)
+      const fecha = e.date
       const descripcion = `"${e.description.replace(/"/g, '""')}"`
       const categoria = CATEGORIES[e.category].label
       return [fecha, descripcion, categoria, e.amount, e.currency, payer?.name ?? ''].join(',')

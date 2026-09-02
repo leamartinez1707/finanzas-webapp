@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, ArrowLeft, PartyPopper } from 'lucide-react'
+import { ArrowRight, ArrowLeft, PartyPopper, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { Field, inputClass } from '@/components/field'
 import { CurrencySelect } from '@/components/currency-select'
@@ -12,7 +12,7 @@ import { showError, showSuccess } from '@/lib/toast'
 
 export default function CrearHogarPage() {
   const router = useRouter()
-  const { createHousehold, setSelectedContext } = useApp()
+  const { createHousehold, setSelectedContext, busy } = useApp()
   const [step, setStep] = useState<'form' | 'invite'>('form')
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState<CurrencyCode>('UYU')
@@ -71,10 +71,20 @@ export default function CrearHogarPage() {
             <div className="mt-auto pt-8">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px"
+                disabled={busy}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Crear hogar
-                <ArrowRight className="size-4.5" />
+                {busy ? (
+                  <>
+                    <Loader2 className="size-4.5 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    Crear hogar
+                    <ArrowRight className="size-4.5" />
+                  </>
+                )}
               </button>
             </div>
           </form>

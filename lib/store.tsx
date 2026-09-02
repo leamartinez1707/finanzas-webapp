@@ -55,7 +55,7 @@ import {
   type ExpenseFilter,
 } from './supabase/queries'
 import { showError } from './toast'
-import { monthKey } from './format'
+import { monthKey, todayLocalISO } from './format'
 
 interface AppState {
   currentUserId: string | null
@@ -93,7 +93,7 @@ interface AppState {
   addRepayment: (r: Omit<Repayment, 'id' | 'createdById'>) => Promise<void>
   updateRepayment: (id: string, patch: Partial<Repayment>) => Promise<void>
   deleteRepayment: (id: string) => Promise<void>
-  addContribution: (goalId: string, memberId: string, amount: number) => Promise<void>
+  addContribution: (goalId: string, memberId: string, amount: number, date?: string) => Promise<void>
   deleteContribution: (id: string) => Promise<void>
   addGoal: (g: Omit<Goal, 'id' | 'contributions'>) => Promise<void>
   updateGoal: (id: string, patch: Partial<Goal>) => Promise<void>
@@ -168,31 +168,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // ─── load all data on mount ───────────────────────────────────────
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  // `silent: true` is refresh()'s mode — it reruns the exact same fetch
+  // but must never toggle the global `loading` flag, since every page
+  // gates its whole content on it ("if (loading) return null"). A silent
+  // reload replaces state only once the fresh data is in, so the screen
+  // keeps showing the stale data until the swap instead of going blank.
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false
+    if (!silent) setLoading(true)
     setLoadError(null)
     try {
       const user = await getCurrentUser()
       if (!user) {
-        setLoading(false)
+        if (!silent) setLoading(false)
         return
       }
 
-      setCurrentUserId(user.id)
-      setMembers([user])
-
       // Load households
       const hh = await getMyHouseholds(user.id)
-      setHouseholds(hh)
 
       // Apply the user's saved default context once, on the very first
       // load — never on a later refresh(), so it doesn't fight with
-      // wherever the user has since navigated to.
+      // wherever the user has since navigated to. Applied together with
+      // everything else below, not here — see the batch-write note.
+      let contextToApply: string | undefined
       if (!defaultContextAppliedRef.current) {
         defaultContextAppliedRef.current = true
         const preferred = user.defaultContext
         if (preferred && hh.some((h) => h.id === preferred)) {
-          setSelectedContext(preferred)
+          contextToApply = preferred
         }
       }
 
@@ -241,7 +245,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // index on expenses(recurring_expense_id, month), which
       // generateRecurringExpense() catches (23505) and returns null for.
       const today = new Date()
-      const todayIso = today.toISOString()
+      const todayIso = todayLocalISO()
       const currentMonth = monthKey(todayIso)
       const due = allRecurring.filter(
         (t) =>
@@ -257,6 +261,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           )
         : []
 
+      // Apply everything together, in one synchronous block, so a silent
+      // refresh never paints an in-between state — e.g. `members` holding
+      // only the current user while `expenses` already references other
+      // members' ids. React batches these into a single re-render.
+      setCurrentUserId(user.id)
+      setHouseholds(hh)
+      if (contextToApply) setSelectedContext(contextToApply)
       setMembers(allProfs)
       setExpenses([...generated, ...allExpenses])
       setRecurringExpenses(allRecurring)
@@ -264,9 +275,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
-      setLoading(false)
+      if (!silent) setLoading(false)
     } catch (error) {
-      setLoading(false)
+      if (!silent) setLoading(false)
       setLoadError(error)
       showError(error)
       throw error
@@ -376,8 +387,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await deleteRepaymentDB(id)
         setRepayments((prev) => prev.filter((r) => r.id !== id))
       }),
-      addContribution: wrapBusy(async (goalId, memberId, amount) => {
-        const created = await addContributionDB(goalId, memberId, amount)
+      addContribution: wrapBusy(async (goalId, memberId, amount, date) => {
+        const created = await addContributionDB(goalId, memberId, amount, date)
         setGoals((prev) =>
           prev.map((g) =>
             g.id === goalId
@@ -496,7 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         )
       }),
 
-      refresh: loadData,
+      refresh: () => loadData({ silent: true }),
     }
   }, [
     currentUserId,

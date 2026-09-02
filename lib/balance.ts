@@ -1,3 +1,4 @@
+import { parseLocalDate } from './format'
 import type { CurrencyCode, Expense, Member, Repayment } from './types'
 
 export interface MemberBalance {
@@ -19,7 +20,7 @@ export interface Settlement {
 
 function filterByMonth<T extends { date: string }>(items: T[], month: { year: number; month: number }): T[] {
   return items.filter((item) => {
-    const d = new Date(item.date)
+    const d = parseLocalDate(item.date)
     return d.getFullYear() === month.year && d.getMonth() === month.month
   })
 }
@@ -61,6 +62,42 @@ export function expenseShare(expense: Expense, memberId: string, memberCount: nu
     return Math.round((expense.amount * pct) / 100)
   }
   return memberCount > 1 ? Math.round(expense.amount / memberCount) : expense.amount
+}
+
+// Gastos de `creditorId` en los que `debtorId` todavía tiene saldo pendiente,
+// tratando la deuda como una cuenta corriente: se suma todo lo que debtorId
+// ya le transfirió a creditorId en esa moneda (todo el historial) y se va
+// descontando de sus gastos más viejos primero. Así el buscador de "gasto
+// relacionado" no acumula para siempre — lo ya saldado deja de aparecer solo,
+// sin que nadie tenga que marcarlo a mano.
+export function unsettledExpenseIds(
+  expenses: Expense[],
+  repayments: Repayment[],
+  debtorId: string,
+  creditorId: string,
+  currency: CurrencyCode,
+  memberCount: number,
+): Set<string> {
+  const owed = expenses
+    .filter((e) => e.scope === 'household' && e.currency === currency && e.payerId === creditorId && e.payerId !== debtorId)
+    .map((e) => ({ id: e.id, date: e.date, share: expenseShare(e, debtorId, memberCount) }))
+    .filter((e) => e.share > 0)
+    .sort((a, b) => +parseLocalDate(a.date) - +parseLocalDate(b.date))
+
+  let alreadyPaid = repayments
+    .filter((r) => r.fromId === debtorId && r.toId === creditorId && r.currency === currency)
+    .reduce((s, r) => s + r.amount, 0)
+
+  const unsettled = new Set<string>()
+  for (const e of owed) {
+    if (alreadyPaid >= e.share - 0.01) {
+      alreadyPaid -= e.share
+    } else {
+      unsettled.add(e.id)
+      alreadyPaid = 0
+    }
+  }
+  return unsettled
 }
 
 export function sumByCurrency<T extends { amount: number; currency: CurrencyCode }>(

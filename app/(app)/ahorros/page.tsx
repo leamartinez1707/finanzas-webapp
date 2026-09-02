@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, PiggyBank, ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
+import { Plus, PiggyBank, ArrowDown, ArrowUp, Trash2, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -9,7 +9,7 @@ import { Money } from '@/components/money'
 import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
-import { formatDate, formatRelative } from '@/lib/format'
+import { formatDate, formatRelative, parseLocalDate, todayLocalISO } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { SavingsMovement } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
@@ -23,6 +23,7 @@ export default function AhorrosPage() {
     loading,
     members,
     savings,
+    busy,
     addSavings,
     updateSavings,
     deleteSavings,
@@ -32,6 +33,7 @@ export default function AhorrosPage() {
   const [editing, setEditing] = useState<SavingsMovement | undefined>(undefined)
   const [movType, setMovType] = useState<'deposito' | 'retiro'>('deposito')
   const [movAmount, setMovAmount] = useState('')
+  const [movDate, setMovDate] = useState(todayLocalISO())
   const [movNote, setMovNote] = useState('')
   const [movError, setMovError] = useState('')
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
@@ -65,7 +67,7 @@ export default function AhorrosPage() {
 
   // Sort movements by date desc
   for (const [id, movs] of savingsByMember) {
-    movs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    movs.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }
 
   function memberBalance(memberId: string) {
@@ -84,7 +86,7 @@ export default function AhorrosPage() {
         householdId: isPersonal ? undefined : activeHousehold?.id,
         type: movType,
         amount: value,
-        date: new Date().toISOString(),
+        date: movDate,
         note: movNote.trim() || undefined,
       })
       showSuccess('Movimiento registrado.')
@@ -102,6 +104,7 @@ export default function AhorrosPage() {
     setEditing(mov)
     setMovType(mov.type)
     setMovAmount(String(mov.amount))
+    setMovDate(mov.date)
     setMovNote(mov.note ?? '')
     setMovError('')
   }
@@ -115,7 +118,7 @@ export default function AhorrosPage() {
       await updateSavings(editing.id, {
         type: movType,
         amount: value,
-        date: editing.date,
+        date: movDate,
         note: movNote.trim() || undefined,
       })
       showSuccess('Movimiento actualizado.')
@@ -152,7 +155,7 @@ export default function AhorrosPage() {
         subtitle={isPersonal ? 'Tu ahorro personal' : activeHousehold?.name}
         action={
           <button
-              onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovNote(''); setMovError('') }}
+              onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovDate(todayLocalISO()); setMovNote(''); setMovError('') }}
             className="inline-flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:translate-y-px"
             aria-label="Registrar movimiento"
           >
@@ -231,7 +234,7 @@ export default function AhorrosPage() {
                               {mov.note && ` · ${mov.note}`}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
-                              {formatRelative(mov.date)}
+                              {formatRelative(mov.date, mov.createdAt)}
                             </p>
                           </div>
                           <Money
@@ -263,7 +266,7 @@ export default function AhorrosPage() {
           }
           action={
             <button
-            onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovNote(''); setMovError('') }}
+            onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovDate(todayLocalISO()); setMovNote(''); setMovError('') }}
               className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
               <Plus className="size-4" />
@@ -325,6 +328,16 @@ export default function AhorrosPage() {
             />
           </Field>
 
+          <Field label="Fecha" htmlFor="savings-date">
+            <input
+              id="savings-date"
+              type="date"
+              value={movDate}
+              onChange={(e) => setMovDate(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
           <Field label="Nota (opcional)" htmlFor="savings-note">
             <input
               id="savings-note"
@@ -341,18 +354,27 @@ export default function AhorrosPage() {
             <button
               type="button"
               onClick={() => setAdding(false)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={busy}
               className={cn(
-                'flex-[2] rounded-2xl py-3.5 font-semibold text-white transition-transform active:translate-y-px',
+                'flex-[2] rounded-2xl py-3.5 font-semibold text-white transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
                 movType === 'deposito' ? 'bg-positive' : 'bg-destructive',
               )}
             >
-              Registrar {movType === 'deposito' ? 'depósito' : 'retiro'}
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Registrando...
+                </span>
+              ) : (
+                `Registrar ${movType === 'deposito' ? 'depósito' : 'retiro'}`
+              )}
             </button>
           </div>
         </form>
@@ -409,6 +431,16 @@ export default function AhorrosPage() {
             />
           </Field>
 
+          <Field label="Fecha" htmlFor="edit-savings-date">
+            <input
+              id="edit-savings-date"
+              type="date"
+              value={movDate}
+              onChange={(e) => setMovDate(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
           <Field label="Nota (opcional)" htmlFor="edit-savings-note">
             <input
               id="edit-savings-note"
@@ -425,28 +457,45 @@ export default function AhorrosPage() {
             <button
               type="button"
               onClick={() => setEditing(undefined)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={busy}
               className={cn(
-                'flex-[2] rounded-2xl py-3.5 font-semibold text-white transition-transform active:translate-y-px',
+                'flex-[2] rounded-2xl py-3.5 font-semibold text-white transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
                 movType === 'deposito' ? 'bg-positive' : 'bg-destructive',
               )}
             >
-              Guardar cambios
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : 'Guardar cambios'}
             </button>
           </div>
 
           <button
             type="button"
             onClick={handleDelete}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10"
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Trash2 className="size-4" />
-            Eliminar movimiento
+            {busy ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Eliminando...
+              </>
+            ) : (
+              <>
+                <Trash2 className="size-4" />
+                Eliminar movimiento
+              </>
+            )}
           </button>
         </form>
       </Sheet>

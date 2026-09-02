@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Clock3, LayoutGrid, LogOut, PiggyBank, ReceiptText, Settings2, Target } from 'lucide-react'
+import { Clock3, LayoutGrid, LogOut, PiggyBank, ReceiptText, RefreshCw, Settings2, Target } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { ContextSwitcher } from '@/components/context-switcher'
 import { useApp } from '@/lib/store'
@@ -20,7 +21,20 @@ export const NAV_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { isPersonal } = useApp()
+  const { isPersonal, refresh } = useApp()
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await refresh()
+    } catch (error) {
+      showError(error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/70 px-4 py-5 lg:flex">
@@ -70,6 +84,15 @@ export function AppSidebar() {
         </Link>
       )}
 
+      <button
+        type="button"
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground disabled:opacity-60"
+      >
+        <RefreshCw className={cn('size-4.5', refreshing && 'animate-spin')} aria-hidden />
+        Actualizar datos
+      </button>
       <button
         type="button"
         onClick={() => signOut().catch(showError)}

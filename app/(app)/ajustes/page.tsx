@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   ArrowRight,
   UserMinus,
+  Loader2,
 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
@@ -34,6 +35,7 @@ export default function AjustesPage() {
     members,
     currentUser,
     loading,
+    busy,
     setSelectedContext,
     updateHousehold,
     createHousehold,
@@ -246,10 +248,20 @@ export default function AjustesPage() {
           </ul>
           <button
             onClick={handleCreateAnother}
-            className="mt-2 flex w-full items-center gap-2 rounded-2xl border border-dashed border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+            disabled={busy}
+            className="mt-2 flex w-full items-center gap-2 rounded-2xl border border-dashed border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Plus className="size-4" />
-            Crear otro hogar
+            {busy ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Creando...
+              </>
+            ) : (
+              <>
+                <Plus className="size-4" />
+                Crear otro hogar
+              </>
+            )}
           </button>
         </section>
       )}
@@ -293,15 +305,22 @@ export default function AjustesPage() {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground"
+              disabled={busy}
+              className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Guardar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : 'Guardar'}
             </button>
           </div>
         </form>
@@ -343,15 +362,22 @@ export default function AjustesPage() {
           <div className="flex gap-2 pt-2">
             <button
               onClick={() => setShowLeave(false)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               onClick={handleLeave}
-              className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px"
+              disabled={busy}
+              className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Salir del hogar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Saliendo...
+                </span>
+              ) : 'Salir del hogar'}
             </button>
           </div>
         </div>
@@ -387,15 +413,22 @@ export default function AjustesPage() {
           <div className="flex gap-2 pt-2">
             <button
               onClick={() => setMemberToRemove(null)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               onClick={handleRemoveMember}
-              className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px"
+              disabled={busy}
+              className="flex-[2] rounded-2xl bg-destructive py-3.5 font-semibold text-white transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Sacar del hogar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Sacando...
+                </span>
+              ) : 'Sacar del hogar'}
             </button>
           </div>
         </div>
@@ -437,7 +470,7 @@ function HouseholdSplitForm({
     })
     return initial
   })
-  const [saving, setSaving] = useState(false)
+  const { busy } = useApp()
 
   const splitSum = Object.values(splitPercents).reduce((sum, v) => sum + (Number(v) || 0), 0)
   const splitMatches = Math.abs(splitSum - 100) < 0.01
@@ -445,21 +478,11 @@ function HouseholdSplitForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!splitMatches) return
-    setSaving(true)
-    try {
-      await onSave(members.map((m) => ({ memberId: m.id, percent: Number(splitPercents[m.id]) || 0 })))
-    } finally {
-      setSaving(false)
-    }
+    await onSave(members.map((m) => ({ memberId: m.id, percent: Number(splitPercents[m.id]) || 0 })))
   }
 
   async function handleReset() {
-    setSaving(true)
-    try {
-      await onSave(null)
-    } finally {
-      setSaving(false)
-    }
+    await onSave(null)
   }
 
   return (
@@ -496,17 +519,22 @@ function HouseholdSplitForm({
         <button
           type="button"
           onClick={handleReset}
-          disabled={saving}
+          disabled={busy}
           className="flex-1 rounded-2xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
           Partes iguales
         </button>
         <button
           type="submit"
-          disabled={saving || !splitMatches}
+          disabled={busy || !splitMatches}
           className="flex-[2] rounded-2xl bg-primary py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? 'Guardando...' : 'Guardar división'}
+          {busy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              Guardando...
+            </span>
+          ) : 'Guardar división'}
         </button>
       </div>
     </form>

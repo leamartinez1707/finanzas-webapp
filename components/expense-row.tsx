@@ -6,7 +6,7 @@ import { CATEGORIES } from '@/lib/categories'
 import { CategoryIcon } from '@/components/category-icon'
 import { Money, CurrencyTag } from '@/components/money'
 import { PersonAvatar } from '@/components/person-avatar'
-import { formatRelative } from '@/lib/format'
+import { formatRelative, parseLocalDate } from '@/lib/format'
 import type { CurrencyCode, Expense, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -29,7 +29,7 @@ export function ExpenseRow({
   const share = expenseShare(expense, currentUserId ?? '', members)
   const isPayer = expense.payerId === currentUserId
 
-  const expenseDate = new Date(expense.date)
+  const expenseDate = parseLocalDate(expense.date)
   const expenseMonth = expenseDate.getMonth()
   const expenseYear = expenseDate.getFullYear()
 
@@ -38,7 +38,7 @@ export function ExpenseRow({
         .filter((r) => {
           if (r.fromId !== currentUserId || r.toId !== expense.payerId) return false
           if (r.currency !== expense.currency) return false
-          const rd = new Date(r.date)
+          const rd = parseLocalDate(r.date)
           return rd.getFullYear() === expenseYear && rd.getMonth() === expenseMonth
         })
         .reduce((s, r) => s + r.amount, 0)
@@ -63,8 +63,8 @@ export function ExpenseRow({
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {CATEGORIES[expense.category].label}
           {payer && expense.scope === 'household' && ` · pagó ${payer.name}`}
-          {` · ${formatRelative(expense.date)}`}
         </p>
+        <p className="truncate text-xs text-muted-foreground">{formatRelative(expense.date, expense.createdAt)}</p>
       </div>
       <div className="flex items-center gap-2">
         {expense.scope === 'household' && members > 1 && !isPayer && paidBack > 0 && (

@@ -55,6 +55,7 @@ export interface Expense {
   amount: number
   currency: CurrencyCode
   date: string // ISO date
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `date`, which never does
   recurringExpenseId?: string | null // set when generated from a RecurringExpense template
   shares?: ExpenseShare[] | null // manual per-expense override (fixed amounts)
   splitSnapshot?: SplitPercent[] | null // frozen copy of household.defaultSplit at creation time
@@ -94,6 +95,7 @@ export interface Repayment {
   amount: number
   currency: CurrencyCode
   date: string
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `date`, which never does
   note?: string
   expenseId?: string | null
   createdById: string
@@ -104,6 +106,7 @@ export interface Contribution {
   memberId: string
   amount: number
   date: string
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `date`, which never does
 }
 
 export interface Goal {
@@ -126,6 +129,7 @@ export interface SavingsMovement {
   type: 'deposito' | 'retiro'
   amount: number
   date: string
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `date`, which never does
   note?: string
 }
 
@@ -140,6 +144,7 @@ export interface ActivityItem {
   amount: number
   currency: CurrencyCode
   date: string
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `date`, which never does
   category?: CategoryId
   direction: 'in' | 'out'
 }

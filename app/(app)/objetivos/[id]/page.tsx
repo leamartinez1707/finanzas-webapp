@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Plus, CalendarDays, House, User, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, CalendarDays, House, User, Pencil, Trash2, X, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -10,7 +10,7 @@ import { Money } from '@/components/money'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
 import { goalSaved } from '@/components/goal-card'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatRelative, parseLocalDate, todayLocalISO } from '@/lib/format'
 import { GoalForm } from '../goal-form'
 import type { Goal } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
@@ -18,12 +18,13 @@ import { showError, showSuccess } from '@/lib/toast'
 export default function GoalDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { goals, members, getMember, activeCurrency, addContribution, deleteContribution, updateGoal, deleteGoal, currentUser } = useApp()
+  const { goals, members, getMember, activeCurrency, addContribution, deleteContribution, updateGoal, deleteGoal, currentUser, busy } = useApp()
 
   const goal = useMemo(() => goals.find((g) => g.id === params.id), [goals, params.id])
 
   const [contributing, setContributing] = useState(false)
   const [contribAmount, setContribAmount] = useState('')
+  const [contribDate, setContribDate] = useState(todayLocalISO())
   const [contribError, setContribError] = useState('')
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -42,7 +43,7 @@ export default function GoalDetailPage() {
   const done = pct >= 100
 
   const sortedContributions = [...goal.contributions].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
   )
 
   async function handleContribute(e: React.FormEvent) {
@@ -50,7 +51,7 @@ export default function GoalDetailPage() {
     const value = Number(contribAmount)
     if (!value || value <= 0) return setContribError('Ingresá un monto válido')
     try {
-      await addContribution(goal!.id, currentUser!.id, value)
+      await addContribution(goal!.id, currentUser!.id, value, contribDate)
       showSuccess('Aporte registrado.')
     } catch (error) {
       showError(error)
@@ -58,6 +59,7 @@ export default function GoalDetailPage() {
     }
     setContributing(false)
     setContribAmount('')
+    setContribDate(todayLocalISO())
     setContribError('')
   }
 
@@ -178,7 +180,7 @@ export default function GoalDetailPage() {
       {/* --- contribute button --- */}
       {!done && (
         <button
-          onClick={() => setContributing(true)}
+          onClick={() => { setContributing(true); setContribAmount(''); setContribDate(todayLocalISO()); setContribError('') }}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground transition-transform active:translate-y-px"
         >
           <Plus className="size-5" />
@@ -205,16 +207,17 @@ export default function GoalDetailPage() {
                     <p className="text-sm font-medium">
                       {member?.name ?? 'Desconocido'}
                     </p>
-                    <p className="text-xs text-muted-foreground">{formatDate(c.date)}</p>
+                    <p className="text-xs text-muted-foreground">{formatRelative(c.date, c.createdAt)}</p>
                   </div>
                   <Money amount={c.amount} currency={goal.currency} className="text-base font-semibold text-positive" sign />
                   {c.memberId === currentUser?.id && (
                     <button
                       onClick={() => handleDeleteContribution(c.id)}
-                      className="ml-1 shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      disabled={busy}
+                      className="ml-1 shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
                       aria-label="Eliminar aporte"
                     >
-                      <X className="size-3.5" />
+                      {busy ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
                     </button>
                   )}
                 </li>
@@ -251,20 +254,36 @@ export default function GoalDetailPage() {
             Moneda: {goal.currency} · Faltan{' '}
             <Money amount={goal.target - saved} currency={goal.currency} className="tnum text-sm font-medium" />
           </p>
+          <Field label="Fecha" htmlFor="contrib-date">
+            <input
+              id="contrib-date"
+              type="date"
+              value={contribDate}
+              onChange={(e) => setContribDate(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
           {contribError && <p className="text-sm font-medium text-destructive">{contribError}</p>}
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={() => setContributing(false)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+              disabled={busy}
+              className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Aportar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Aportando...
+                </span>
+              ) : 'Aportar'}
             </button>
           </div>
         </form>
@@ -296,15 +315,22 @@ export default function GoalDetailPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setConfirmDelete(false)}
-              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               onClick={handleDelete}
-              className="flex-1 rounded-2xl bg-destructive py-3.5 font-semibold text-destructive-foreground transition-transform active:translate-y-px"
+              disabled={busy}
+              className="flex-1 rounded-2xl bg-destructive py-3.5 font-semibold text-destructive-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Eliminar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Eliminando...
+                </span>
+              ) : 'Eliminar'}
             </button>
           </div>
         </div>

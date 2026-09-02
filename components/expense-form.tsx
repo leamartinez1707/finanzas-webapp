@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CATEGORY_LIST } from '@/lib/categories'
 import { Field, inputClass } from '@/components/field'
 import { CategoryIcon } from '@/components/category-icon'
 import { PersonAvatar } from '@/components/person-avatar'
 import { CurrencySelect } from '@/components/currency-select'
+import { todayLocalISO } from '@/lib/format'
 import type { CategoryId, CurrencyCode, Expense } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +23,7 @@ export function ExpenseForm({
   onCancel?: () => void
   onDelete?: () => void
 }) {
-  const { isPersonal, activeHousehold, activeCurrency, currentUser, members } = useApp()
+  const { isPersonal, activeHousehold, activeCurrency, currentUser, members, busy } = useApp()
 
   const householdMembers = activeHousehold
     ? activeHousehold.memberIds.map((id) => members.find((m) => m.id === id)!).filter(Boolean)
@@ -33,6 +34,7 @@ export function ExpenseForm({
   const [category, setCategory] = useState<CategoryId>(initial?.category ?? 'super')
   const [currency, setCurrency] = useState<CurrencyCode>(initial?.currency ?? activeCurrency)
   const [payerId, setPayerId] = useState(initial?.payerId ?? currentUser?.id ?? '')
+  const [date, setDate] = useState(initial?.date ?? todayLocalISO())
   const [error, setError] = useState('')
 
   // customSplit only ever starts true for a real manual override — never for
@@ -112,7 +114,7 @@ export function ExpenseForm({
       category,
       amount: value,
       currency,
-      date: initial?.date ?? new Date().toISOString(),
+      date,
       ...buildSplitFields(),
     })
   }
@@ -150,6 +152,16 @@ export function ExpenseForm({
             setError('')
           }}
           placeholder="Ej: Súper de la semana"
+          className={inputClass}
+        />
+      </Field>
+
+      <Field label="Fecha" htmlFor="expense-date">
+        <input
+          id="expense-date"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
           className={inputClass}
         />
       </Field>
@@ -276,16 +288,23 @@ export function ExpenseForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted"
+            disabled={busy}
+            className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
             Cancelar
           </button>
         )}
         <button
           type="submit"
-          className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px"
+          disabled={busy}
+          className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {initial ? 'Guardar cambios' : 'Agregar gasto'}
+          {busy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              {initial ? 'Guardando...' : 'Agregando...'}
+            </span>
+          ) : initial ? 'Guardar cambios' : 'Agregar gasto'}
         </button>
       </div>
 
@@ -293,10 +312,20 @@ export function ExpenseForm({
         <button
           type="button"
           onClick={onDelete}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10"
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/30 py-3 font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Trash2 className="size-4" />
-          Eliminar gasto
+          {busy ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Eliminando...
+            </>
+          ) : (
+            <>
+              <Trash2 className="size-4" />
+              Eliminar gasto
+            </>
+          )}
         </button>
       )}
     </form>

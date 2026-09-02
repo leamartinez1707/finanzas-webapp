@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell } from 'lucide-react'
+import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { expenseShare } from '@/lib/balance'
@@ -36,6 +36,7 @@ export default function InicioPage() {
     savings,
     repayments,
     myHouseholds,
+    busy,
     updateProfile,
     setDefaultContext,
     addRepayment,
@@ -327,15 +328,22 @@ export default function InicioPage() {
             <button
               type="button"
               onClick={() => setProfileOpen(false)}
-              className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground"
+              disabled={busy}
+              className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-[2] rounded-xl bg-primary py-3 font-semibold text-primary-foreground"
+              disabled={busy}
+              className="flex-[2] rounded-xl bg-primary py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Guardar
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : 'Guardar'}
             </button>
           </div>
 
