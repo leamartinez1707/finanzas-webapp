@@ -14,6 +14,38 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'tareas-del-hogar',
+    title: 'Tareas: control de la casa, no solo de la plata',
+    excerpt:
+      'Nueva sección de Tareas: cargá qué hay que hacer, quién lo tiene que hacer y para cuándo. Cada uno ve sus tareas de hoy y las que vienen, sin perder de vista lo atrasado.',
+    date: '2026-09-04',
+    content: (
+      <>
+        <p key="p1">
+          Nido empezó siendo control de la plata compartida. Ahora suma{' '}
+          <strong>Tareas</strong>, para el otro lado de organizar una casa entre
+          varios: quién saca la basura, quién hace las compras, quién lleva el
+          auto al service. Cargás una descripción, elegís a quién se la asignás,
+          y le ponés fecha límite — la hora es opcional, para cuando importa el
+          momento del día, no solo el día.
+        </p>
+        <p key="p2">
+          Tocar una tarea la marca hecha al instante, con un tache — sin abrir
+          ningún formulario. No desaparece de la lista: queda tachada al fondo
+          de su día, así un toque sin querer se deshace fácil. Las tareas se
+          organizan en <strong>Atrasadas</strong>, <strong>Hoy</strong> y{' '}
+          <strong>Futuras</strong>, y en el hogar podés alternar entre ver solo
+          las tuyas o las de todos.
+        </p>
+        <p key="p3" className="text-sm text-muted-foreground">
+          También funciona en Mis finanzas, como una lista de pendientes
+          personal — no tiene por qué ser algo de la casa, es para organizarte
+          los días en general.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'ahorros-de-verdad',
     title: 'Ahorros, separados de tus ingresos',
     excerpt:

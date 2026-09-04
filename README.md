@@ -1,8 +1,8 @@
-# Nido — Finanzas compartidas del hogar
+# Nido — Finanzas y organización del hogar
 
 **[Nido App](https://finanzas-nido.vercel.app/)**
 
-Una app para parejas, roommates y familias que quieren transparencia sobre la plata compartida sin perder su espacio personal. Creás un hogar, invitás a quienes convivís, y entre todos llevan gastos, objetivos de ahorro y balances. Cada persona además tiene su espacio privado de finanzas.
+Una app para parejas, roommates y familias que quieren transparencia sobre la plata compartida sin perder su espacio personal, y una forma simple de repartirse las tareas de la casa. Creás un hogar, invitás a quienes convivís, y entre todos llevan gastos, objetivos de ahorro, balances y tareas. Cada persona además tiene su espacio privado de finanzas y sus propios pendientes.
 
 Mobile-first, pensada para sesiones rápidas: cargar un gasto en 10 segundos, chequear quién debe qué, ver cuánto falta para ese objetivo.
 
@@ -32,6 +32,7 @@ Mobile-first, pensada para sesiones rápidas: cargar un gasto en 10 segundos, ch
 - **Objetivos de ahorro** — del hogar y personales. Con barra de progreso, historial de aportes y moneda editable por objetivo.
 - **Ingresos** — cada persona registra los ingresos y retiros con los que paga sus gastos del mes.
 - **Ahorros** — plata apartada, separada de los ingresos. Se puede transferir directo desde Ingresos en un solo paso.
+- **Tareas** — agenda de tareas del hogar (o personales): descripción, quién la tiene que hacer, fecha límite y hora opcional. Se completan al toque, agrupadas en Atrasadas / Hoy / Futuras.
 - **Finanzas personales** — gastos y objetivos privados, separados de cualquier hogar. Funcionan incluso si no pertenecés a ningún hogar.
 - **Dashboard** — resumen con balance entre miembros, objetivos activos, ahorro combinado. Cambia según el contexto (hogar o personal).
 - **Resumen** — total del mes con variación contra el anterior, desglose por categoría y por persona, y exportación a CSV.
@@ -123,6 +124,7 @@ finanzas-compartidas/
 │       ├── inicio/       # Dashboard
 │       ├── gastos/       # Listado + alta de gastos, recurrentes y presupuestos
 │       ├── objetivos/    # Objetivos de ahorro + detalle
+│       ├── tareas/       # Agenda de tareas del hogar y personales
 │       ├── ingresos/     # Ingresos y retiros con los que se pagan los gastos
 │       ├── ahorros/      # Plata apartada, separada de los ingresos
 │       ├── resumen/      # Totales, por categoría, por persona, export CSV
