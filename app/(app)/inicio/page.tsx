@@ -114,9 +114,11 @@ export default function InicioPage() {
     .reduce((s, e) => s + e.amount, 0)
 
   // net income entered (deposits minus withdrawals) — this is the money the
-  // user actually has to cover expenses with, not a separate savings pot
+  // user actually has to cover expenses with, not a separate savings pot.
+  // Only the 'ingresos' bucket counts here — money moved to 'ahorro' is set
+  // aside on purpose and shouldn't count as available.
   const personalIncome = savings
-    .filter((s) => s.scope === 'personal' && s.memberId === currentUser?.id)
+    .filter((s) => s.bucket === 'ingresos' && s.scope === 'personal' && s.memberId === currentUser?.id)
     .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
 
   // total ever spent, so we can net it against income and show what's actually left

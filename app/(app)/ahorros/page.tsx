@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, Wallet, ArrowDown, ArrowUp, Trash2, Loader2 } from 'lucide-react'
+import { Plus, PiggyBank, ArrowDown, ArrowUp, ArrowRightLeft, Trash2, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -9,12 +9,12 @@ import { Money } from '@/components/money'
 import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
-import { formatDate, formatRelative, parseLocalDate, todayLocalISO } from '@/lib/format'
+import { formatRelative, parseLocalDate, todayLocalISO } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { SavingsMovement } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
-export default function IngresosPage() {
+export default function AhorrosPage() {
   const {
     isPersonal,
     activeHousehold,
@@ -27,6 +27,7 @@ export default function IngresosPage() {
     addSavings,
     updateSavings,
     deleteSavings,
+    transferToSavings,
   } = useApp()
 
   const [adding, setAdding] = useState(false)
@@ -38,6 +39,12 @@ export default function IngresosPage() {
   const [movError, setMovError] = useState('')
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
 
+  const [transferring, setTransferring] = useState(false)
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferDate, setTransferDate] = useState(todayLocalISO())
+  const [transferNote, setTransferNote] = useState('')
+  const [transferError, setTransferError] = useState('')
+
   // Members to show: in household mode, all household members; in personal mode, just current user
   const visibleMembers = useMemo(() => {
     if (isPersonal) return currentUser ? [currentUser] : []
@@ -47,11 +54,20 @@ export default function IngresosPage() {
       .filter(Boolean)
   }, [isPersonal, activeHousehold, currentUser, members])
 
-  // Income movements per member, scoped to current context
+  // Available balance in Ingresos, for the "current user, personal" case only —
+  // just a hint shown while transferring, not a hard limit.
+  const availableInIngresos = useMemo(() => {
+    if (!isPersonal || !currentUser) return null
+    return savings
+      .filter((s) => s.bucket === 'ingresos' && s.scope === 'personal' && s.memberId === currentUser.id)
+      .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
+  }, [savings, isPersonal, currentUser])
+
+  // Savings movements per member, scoped to current context
   const savingsByMember = useMemo(() => {
     const map = new Map<string, SavingsMovement[]>()
     for (const s of savings) {
-      if (s.bucket !== 'ingresos') continue
+      if (s.bucket !== 'ahorro') continue
 
       // In household mode, show household scoped movements for that household + personal movements of members
       const matches = isPersonal
@@ -86,7 +102,7 @@ export default function IngresosPage() {
         memberId: currentUser!.id,
         scope: isPersonal ? 'personal' : 'household',
         householdId: isPersonal ? undefined : activeHousehold?.id,
-        bucket: 'ingresos',
+        bucket: 'ahorro',
         type: movType,
         amount: value,
         date: movDate,
@@ -147,6 +163,35 @@ export default function IngresosPage() {
     setEditing(undefined)
   }
 
+  function openTransfer() {
+    setTransferAmount('')
+    setTransferDate(todayLocalISO())
+    setTransferNote('')
+    setTransferError('')
+    setTransferring(true)
+  }
+
+  async function handleTransfer(e: React.FormEvent) {
+    e.preventDefault()
+    const value = Number(transferAmount)
+    if (!value || value <= 0) return setTransferError('Ingresá un monto válido')
+    try {
+      await transferToSavings({
+        amount: value,
+        date: transferDate,
+        note: transferNote.trim() || undefined,
+      })
+      showSuccess('Transferencia registrada.')
+    } catch (error) {
+      showError(error)
+      return
+    }
+    setTransferring(false)
+    setTransferAmount('')
+    setTransferNote('')
+    setTransferError('')
+  }
+
   const hasAnySavings = [...savingsByMember.values()].some((m) => m.length > 0)
 
   if (loading || !currentUser) return null
@@ -154,8 +199,8 @@ export default function IngresosPage() {
   return (
     <div className="space-y-4">
       <ScreenHeader
-        title="Ingresos"
-        subtitle={isPersonal ? 'La plata con la que pagás tus gastos' : activeHousehold?.name}
+        title="Ahorros"
+        subtitle={isPersonal ? 'Lo que apartaste, separado de tus ingresos' : activeHousehold?.name}
         action={
           <button
               onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovDate(todayLocalISO()); setMovNote(''); setMovError('') }}
@@ -166,6 +211,19 @@ export default function IngresosPage() {
           </button>
         }
       />
+
+      <button
+        onClick={openTransfer}
+        className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+      >
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+          <ArrowRightLeft className="size-4.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Mover a ahorros</p>
+          <p className="text-xs text-muted-foreground">Transferí plata desde Ingresos</p>
+        </div>
+      </button>
 
       {hasAnySavings ? (
         <div className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
@@ -203,7 +261,7 @@ export default function IngresosPage() {
                       )}
                     />
                     <p className="text-[10px] text-muted-foreground">
-                      {balance >= 0 ? 'disponible' : 'saldo negativo'}
+                      {balance >= 0 ? 'ahorrado' : 'saldo negativo'}
                     </p>
                   </div>
                 </button>
@@ -233,7 +291,7 @@ export default function IngresosPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium">
-                              {mov.type === 'deposito' ? 'Ingreso' : 'Retiro'}
+                              {mov.type === 'deposito' ? 'Ahorro' : 'Retiro'}
                               {mov.note && ` · ${mov.note}`}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
@@ -260,24 +318,100 @@ export default function IngresosPage() {
         </div>
       ) : (
         <EmptyState
-          icon={Wallet}
-          title="Todavía no hay ingresos"
+          icon={PiggyBank}
+          title="Todavía no hay ahorros"
           description={
             isPersonal
-              ? 'Registrá tu primer ingreso para empezar a ver cuánto tenés disponible.'
-              : 'Registren sus ingresos para verlos acá.'
+              ? 'Mové plata desde Ingresos o registrá un ahorro directo para empezar.'
+              : 'Registren sus ahorros para verlos acá.'
           }
           action={
             <button
-            onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovDate(todayLocalISO()); setMovNote(''); setMovError('') }}
+              onClick={openTransfer}
               className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
-              <Plus className="size-4" />
-              Registrar movimiento
+              <ArrowRightLeft className="size-4" />
+              Mover a ahorros
             </button>
           }
         />
       )}
+
+      {/* --- transfer from Ingresos sheet --- */}
+      <Sheet open={transferring} onClose={() => setTransferring(false)} title="Mover a ahorros">
+        <form onSubmit={handleTransfer} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Registra un retiro en Ingresos y un ahorro por el mismo monto, en un solo paso.
+            {availableInIngresos !== null && (
+              <>
+                {' '}Tenés{' '}
+                <Money amount={availableInIngresos} currency={activeCurrency} className="font-semibold text-foreground" />
+                {' '}disponible en Ingresos.
+              </>
+            )}
+          </p>
+
+          <Field label="Monto" htmlFor="transfer-amount">
+            <input
+              id="transfer-amount"
+              inputMode="decimal"
+              value={transferAmount}
+              onChange={(e) => {
+                setTransferAmount(e.target.value.replace(/[^0-9.]/g, ''))
+                setTransferError('')
+              }}
+              placeholder="0"
+              className={inputClass}
+              autoFocus
+            />
+          </Field>
+
+          <Field label="Fecha" htmlFor="transfer-date">
+            <input
+              id="transfer-date"
+              type="date"
+              value={transferDate}
+              onChange={(e) => setTransferDate(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Nota (opcional)" htmlFor="transfer-note">
+            <input
+              id="transfer-note"
+              value={transferNote}
+              onChange={(e) => setTransferNote(e.target.value)}
+              placeholder="Ej: Para el auto"
+              className={inputClass}
+            />
+          </Field>
+
+          {transferError && <p className="text-sm font-medium text-destructive">{transferError}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setTransferring(false)}
+              disabled={busy}
+              className="flex-1 rounded-2xl border border-border py-3.5 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex-[2] rounded-2xl bg-primary py-3.5 font-semibold text-primary-foreground transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Transfiriendo...
+                </span>
+              ) : 'Mover a ahorros'}
+            </button>
+          </div>
+        </form>
+      </Sheet>
 
       {/* --- add movement sheet --- */}
       <Sheet
@@ -299,7 +433,7 @@ export default function IngresosPage() {
               )}
             >
               <ArrowDown className="size-4" />
-              Ingreso
+              Ahorro
             </button>
             <button
               type="button"
@@ -315,13 +449,6 @@ export default function IngresosPage() {
               Retiro
             </button>
           </div>
-          {movType === 'retiro' && (
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Para plata que salió sin ser un gasto (se la prestaste a alguien, una
-              corrección). Para ahorrar, mejor usá &ldquo;Mover a ahorros&rdquo; en la
-              sección Ahorros.
-            </p>
-          )}
 
           <Field label="Monto" htmlFor="savings-amount">
             <input
@@ -383,7 +510,7 @@ export default function IngresosPage() {
                   Registrando...
                 </span>
               ) : (
-                `Registrar ${movType === 'deposito' ? 'ingreso' : 'retiro'}`
+                `Registrar ${movType === 'deposito' ? 'ahorro' : 'retiro'}`
               )}
             </button>
           </div>
@@ -394,7 +521,7 @@ export default function IngresosPage() {
       <Sheet
         open={!!editing}
         onClose={() => setEditing(undefined)}
-        title={editing?.type === 'deposito' ? 'Editar ingreso' : 'Editar retiro'}
+        title={editing?.type === 'deposito' ? 'Editar ahorro' : 'Editar retiro'}
       >
         <form onSubmit={handleUpdate} className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
@@ -409,7 +536,7 @@ export default function IngresosPage() {
               )}
             >
               <ArrowDown className="size-4" />
-              Ingreso
+              Ahorro
             </button>
             <button
               type="button"

@@ -138,6 +138,7 @@ export interface SavingsMovement {
   memberId: string
   scope: 'household' | 'personal'
   householdId?: string
+  bucket: 'ingresos' | 'ahorro' // 'ingresos' = plata para pagar gastos; 'ahorro' = plata apartada
   type: 'deposito' | 'retiro'
   amount: number
   date: string
@@ -145,7 +146,7 @@ export interface SavingsMovement {
   note?: string
 }
 
-export type ActivityKind = 'gasto' | 'aporte' | 'ingreso' | 'pago'
+export type ActivityKind = 'gasto' | 'aporte' | 'ingreso' | 'ahorro' | 'pago'
 
 export interface ActivityItem {
   id: string

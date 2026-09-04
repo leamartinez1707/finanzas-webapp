@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Clock3, ListFilter, ReceiptText, Target, Wallet, HandCoins } from 'lucide-react'
+import { Clock3, ListFilter, ReceiptText, Target, Wallet, PiggyBank, HandCoins } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { ScreenHeader } from '@/components/screen-header'
@@ -20,6 +20,7 @@ const KIND_LABELS: Record<ActivityKind, { label: string; icon: typeof ReceiptTex
   gasto: { label: 'Gastos', icon: ReceiptText },
   aporte: { label: 'Aportes', icon: Target },
   ingreso: { label: 'Ingresos', icon: Wallet },
+  ahorro: { label: 'Ahorros', icon: PiggyBank },
   pago: { label: 'Pagos', icon: HandCoins },
 }
 
@@ -181,7 +182,7 @@ export default function HistorialPage() {
           description={
             hasFilters
               ? 'Probá con otros filtros.'
-              : 'Cuando registres gastos, aportes o ingresos, van a aparecer acá.'
+              : 'Cuando registres gastos, aportes, ingresos o ahorros, van a aparecer acá.'
           }
         />
       )}
@@ -190,7 +191,7 @@ export default function HistorialPage() {
       <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros">
         <div className="space-y-5">
           <FilterSection title="Tipo">
-            {(['gasto', 'aporte', 'ingreso', 'pago'] as ActivityKind[]).map((kind) => {
+            {(['gasto', 'aporte', 'ingreso', 'ahorro', 'pago'] as ActivityKind[]).map((kind) => {
               const active = kindFilter === kind
               const { label, icon: Icon } = KIND_LABELS[kind]
               return (
