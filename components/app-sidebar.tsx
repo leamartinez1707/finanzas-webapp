@@ -11,13 +11,17 @@ import { signOut } from '@/lib/supabase/queries'
 import { showError } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
+// `primary` marks the items that get their own icon in the mobile bottom
+// nav (limited real estate — 5 slots incl. "Más"); the rest live inside the
+// "Más" sheet there. The desktop sidebar has room for all of them and
+// ignores the flag.
 export const NAV_ITEMS = [
-  { href: '/inicio', label: 'Inicio', icon: LayoutGrid },
-  { href: '/gastos', label: 'Gastos', icon: ReceiptText },
-  { href: '/objetivos', label: 'Objetivos', icon: Target },
-  { href: '/ingresos', label: 'Ingresos', icon: Wallet },
-  { href: '/ahorros', label: 'Ahorros', icon: PiggyBank },
-  { href: '/historial', label: 'Historial', icon: Clock3 },
+  { href: '/inicio', label: 'Inicio', icon: LayoutGrid, primary: true },
+  { href: '/gastos', label: 'Gastos', icon: ReceiptText, primary: true },
+  { href: '/objetivos', label: 'Objetivos', icon: Target, primary: false },
+  { href: '/ingresos', label: 'Ingresos', icon: Wallet, primary: true },
+  { href: '/ahorros', label: 'Ahorros', icon: PiggyBank, primary: true },
+  { href: '/historial', label: 'Historial', icon: Clock3, primary: false },
 ]
 
 export function AppSidebar() {
