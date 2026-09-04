@@ -117,6 +117,13 @@ export default function InicioPage() {
     .filter((s) => s.scope === 'personal' && s.memberId === currentUser?.id)
     .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
 
+  // total ever spent, so we can net it against savings and show what's actually left
+  const personalExpensesTotal = expenses
+    .filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id && e.currency === activeCurrency)
+    .reduce((s, e) => s + e.amount, 0)
+
+  const personalAvailable = personalSavings - personalExpensesTotal
+
   const scopedGoals = goals.filter((g) =>
     isPersonal
       ? g.scope === 'personal' && g.ownerId === currentUser?.id
@@ -170,22 +177,36 @@ export default function InicioPage() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-8">
         <div>
           {isPersonal ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
-                <p className="text-xs font-medium text-muted-foreground">Gasto del mes</p>
+            <div className="space-y-3">
+              <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-5 text-center sm:p-6">
+                <p className="text-xs font-medium text-muted-foreground">Disponible</p>
                 <Money
-                  amount={personalMonth}
+                  amount={personalAvailable}
                   currency={activeCurrency}
-                  className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-destructive"
+                  className={cn(
+                    'mt-1.5 block text-[clamp(1.75rem,16cqw,2.5rem)] leading-tight [overflow-wrap:anywhere]',
+                    personalAvailable >= 0 ? 'text-positive' : 'text-destructive',
+                  )}
                 />
+                <p className="mt-1 text-[11px] text-muted-foreground">Ahorros menos lo gastado</p>
               </div>
-              <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
-                <p className="text-xs font-medium text-muted-foreground">Ahorros</p>
-                <Money
-                  amount={personalSavings}
-                  currency={activeCurrency}
-                  className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-positive"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
+                  <p className="text-xs font-medium text-muted-foreground">Gasto del mes</p>
+                  <Money
+                    amount={personalMonth}
+                    currency={activeCurrency}
+                    className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-destructive"
+                  />
+                </div>
+                <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
+                  <p className="text-xs font-medium text-muted-foreground">Ahorros</p>
+                  <Money
+                    amount={personalSavings}
+                    currency={activeCurrency}
+                    className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-positive"
+                  />
+                </div>
               </div>
             </div>
           ) : (
