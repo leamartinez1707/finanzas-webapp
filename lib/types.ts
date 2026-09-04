@@ -87,6 +87,20 @@ export interface Budget {
   createdById: string
 }
 
+export interface Task {
+  id: string
+  scope: 'household' | 'personal'
+  householdId?: string
+  ownerId: string // quién la creó
+  assigneeId: string // quién la tiene que hacer — vos mismo en scope personal
+  description: string
+  dueDate: string // ISO date, requerido
+  dueTime?: string // 'HH:MM', opcional
+  completed: boolean
+  createdById: string
+  createdAt?: string // when the row was actually inserted (has a real time) — distinct from `dueDate`, which never does
+}
+
 export type PremiumFeatureId =
   | 'conversion_moneda'
   | 'exportar_excel_pdf'

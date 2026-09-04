@@ -1,6 +1,6 @@
 import { createClient } from './client'
 import { todayLocalISO } from '../format'
-import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent, PremiumFeatureId, PremiumWaitlistEntry } from '../types'
+import type { Budget, Expense, Goal, Household, Member, SavingsMovement, Contribution, Invite, CurrencyCode, CategoryId, PersonColor, Repayment, RecurringExpense, ExpenseShare, SplitPercent, PremiumFeatureId, PremiumWaitlistEntry, Task } from '../types'
 
 // ─── helpers ────────────────────────────────────────────────────────
 
@@ -50,6 +50,22 @@ function toBudget(row: any): Budget {
     amount: Number(row.monto),
     currency: row.moneda as CurrencyCode,
     createdById: row.created_by,
+  }
+}
+
+function toTask(row: any): Task {
+  return {
+    id: row.id,
+    scope: row.scope,
+    householdId: row.household_id ?? undefined,
+    ownerId: row.owner_id,
+    assigneeId: row.assignee_id,
+    description: row.descripcion,
+    dueDate: row.fecha_limite,
+    dueTime: row.hora_limite ? row.hora_limite.slice(0, 5) : undefined,
+    completed: row.completed,
+    createdById: row.created_by,
+    createdAt: row.created_at ?? undefined,
   }
 }
 
@@ -607,6 +623,68 @@ export async function deleteBudget(id: string) {
   const s = supabase()
   const { data, error } = await s.from('budgets').delete().eq('id', id).select('id')
   if (!error && !data?.length) throw new Error('No se pudo eliminar el presupuesto (sin permiso o ya no existe).')
+  if (error) throw error
+}
+
+// ─── Tasks ────────────────────────────────────────────────────────
+
+export async function getTasks(filter: ExpenseFilter): Promise<Task[]> {
+  const s = supabase()
+  let query = s.from('tasks').select('*').order('fecha_limite', { ascending: true })
+
+  if (filter.scope === 'personal') {
+    query = query.eq('scope', 'personal').eq('owner_id', filter.ownerId)
+  } else {
+    query = query.eq('scope', 'household').eq('household_id', filter.householdId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map(toTask)
+}
+
+export async function addTask(t: Omit<Task, 'id' | 'createdById'>): Promise<Task> {
+  const s = supabase()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await s
+    .from('tasks')
+    .insert({
+      scope: t.scope,
+      household_id: t.householdId ?? null,
+      owner_id: t.ownerId,
+      assignee_id: t.assigneeId,
+      descripcion: t.description,
+      fecha_limite: t.dueDate,
+      hora_limite: t.dueTime || null,
+      completed: t.completed,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return toTask(data)
+}
+
+export async function updateTask(id: string, patch: Partial<Task>) {
+  const s = supabase()
+  const update: Record<string, any> = {}
+  if (patch.assigneeId !== undefined) update.assignee_id = patch.assigneeId
+  if (patch.description !== undefined) update.descripcion = patch.description
+  if (patch.dueDate !== undefined) update.fecha_limite = patch.dueDate
+  if (patch.dueTime !== undefined) update.hora_limite = patch.dueTime || null
+  if (patch.completed !== undefined) update.completed = patch.completed
+
+  const { error } = await s.from('tasks').update(update).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteTask(id: string) {
+  const s = supabase()
+  const { data, error } = await s.from('tasks').delete().eq('id', id).select('id')
+  if (!error && !data?.length) throw new Error('No se pudo eliminar la tarea (sin permiso o ya no existe).')
   if (error) throw error
 }
 

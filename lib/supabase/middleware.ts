@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const protectedPrefixes = ['/inicio', '/gastos', '/objetivos', '/ingresos', '/ahorros', '/ajustes', '/historial']
+  const protectedPrefixes = ['/inicio', '/gastos', '/objetivos', '/tareas', '/ingresos', '/ahorros', '/ajustes', '/historial']
   if (!user && protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix))) {
     return NextResponse.redirect(
       new URL(`/ingresar?redirect=${encodeURIComponent(request.nextUrl.pathname)}`, request.url),

@@ -10,7 +10,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { Budget, CurrencyCode, Expense, Goal, Household, Member, PremiumFeatureId, PremiumWaitlistEntry, RecurringExpense, Repayment, SavingsMovement } from './types'
+import type { Budget, CurrencyCode, Expense, Goal, Household, Member, PremiumFeatureId, PremiumWaitlistEntry, RecurringExpense, Repayment, SavingsMovement, Task } from './types'
 import {
   getCurrentUser,
   getMyHouseholds,
@@ -31,6 +31,10 @@ import {
   addBudget as addBudgetDB,
   updateBudget as updateBudgetDB,
   deleteBudget as deleteBudgetDB,
+  getTasks,
+  addTask as addTaskDB,
+  updateTask as updateTaskDB,
+  deleteTask as deleteTaskDB,
   getPremiumWaitlistEntry,
   joinPremiumWaitlist as joinPremiumWaitlistDB,
   updatePremiumWaitlistFeatures as updatePremiumWaitlistFeaturesDB,
@@ -72,6 +76,7 @@ interface AppState {
   expenses: Expense[]
   recurringExpenses: RecurringExpense[]
   budgets: Budget[]
+  tasks: Task[]
   goals: Goal[]
   savings: SavingsMovement[]
   repayments: Repayment[]
@@ -96,6 +101,9 @@ interface AppState {
   addBudget: (b: Omit<Budget, 'id' | 'createdById'>) => Promise<void>
   updateBudget: (id: string, patch: Partial<Budget>) => Promise<void>
   deleteBudget: (id: string) => Promise<void>
+  addTask: (t: Omit<Task, 'id' | 'createdById'>) => Promise<void>
+  updateTask: (id: string, patch: Partial<Task>) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
   joinPremiumWaitlist: (features: PremiumFeatureId[]) => Promise<void>
   updatePremiumWaitlistFeatures: (features: PremiumFeatureId[]) => Promise<void>
   leavePremiumWaitlist: () => Promise<void>
@@ -137,6 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [repayments, setRepayments] = useState<Repayment[]>([])
@@ -222,27 +231,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // of one giant sequential chain, so a single slow/failing request
       // doesn't stretch out the window where a mid-flight token refresh
       // can take the whole load down.
-      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalGoals, personalSavings, waitlistEntry, perHousehold] =
+      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalTasks, personalGoals, personalSavings, waitlistEntry, perHousehold] =
         await Promise.all([
           getAllMembers([...allMemberIds]),
           getExpenses(personalFilter),
           getRecurringExpenses(personalFilter),
           getBudgets(personalFilter),
+          getTasks(personalFilter),
           getGoals(personalFilter),
           getSavings(personalFilter, [user.id]),
           getPremiumWaitlistEntry(),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
-              const [exp, rec, bud, goals, sav, rep] = await Promise.all([
+              const [exp, rec, bud, tasks, goals, sav, rep] = await Promise.all([
                 getExpenses(hhFilter),
                 getRecurringExpenses(hhFilter),
                 getBudgets(hhFilter),
+                getTasks(hhFilter),
                 getGoals(hhFilter),
                 getSavings(hhFilter, h.memberIds),
                 getRepayments(h.id),
               ])
-              return { exp, rec, bud, goals, sav, rep }
+              return { exp, rec, bud, tasks, goals, sav, rep }
             }),
           ),
         ])
@@ -250,6 +261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const allExpenses = [...personalExpenses, ...perHousehold.flatMap((r) => r.exp)]
       const allRecurring = [...personalRecurring, ...perHousehold.flatMap((r) => r.rec)]
       const allBudgets = [...personalBudgets, ...perHousehold.flatMap((r) => r.bud)]
+      const allTasks = [...personalTasks, ...perHousehold.flatMap((r) => r.tasks)]
 
       // Generate this month's expense for any active template that has
       // reached its dayOfMonth and doesn't already have one. This is only
@@ -284,6 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setExpenses([...generated, ...allExpenses])
       setRecurringExpenses(allRecurring)
       setBudgets(allBudgets)
+      setTasks(allTasks)
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
@@ -333,6 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       expenses,
       recurringExpenses,
       budgets,
+      tasks,
       goals,
       savings,
       repayments,
@@ -388,6 +402,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteBudget: wrapBusy(async (id) => {
         await deleteBudgetDB(id)
         setBudgets((prev) => prev.filter((b) => b.id !== id))
+      }),
+      addTask: wrapBusy(async (t) => {
+        const created = await addTaskDB(t)
+        setTasks((prev) => [created, ...prev])
+      }),
+      updateTask: wrapBusy(async (id, patch) => {
+        await updateTaskDB(id, patch)
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        )
+      }),
+      deleteTask: wrapBusy(async (id) => {
+        await deleteTaskDB(id)
+        setTasks((prev) => prev.filter((t) => t.id !== id))
       }),
       joinPremiumWaitlist: wrapBusy(async (features) => {
         const entry = await joinPremiumWaitlistDB(features)
@@ -555,6 +583,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     expenses,
     recurringExpenses,
     budgets,
+    tasks,
     goals,
     savings,
     repayments,
