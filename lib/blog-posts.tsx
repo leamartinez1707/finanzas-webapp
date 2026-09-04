@@ -14,6 +14,34 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'saldo-disponible',
+    title: 'Ahora ves cuánto te queda disponible',
+    excerpt:
+      'En Mis finanzas sumamos una tarjeta de "Disponible" que resta lo que gastaste de tus ahorros, para que sepas de un vistazo cuánta plata te queda.',
+    date: '2026-09-04',
+    content: (
+      <>
+        <p key="p1">
+          Hasta ahora, en la pantalla de inicio de <strong>Mis finanzas</strong>{' '}
+          veías dos números separados: cuánto gastaste este mes y cuánto
+          tenías ahorrado. El problema es que esos dos números nunca se
+          cruzaban, así que después de cargar un gasto no había forma de ver,
+          de un vistazo, cuánta plata te quedaba en realidad.
+        </p>
+        <p key="p2">
+          Agregamos una tarjeta de <strong>Disponible</strong> arriba de todo,
+          que resta el total de tus gastos a tus ahorros. Es la respuesta
+          directa a &ldquo;¿cuánto me queda?&rdquo;: se actualiza cada vez que
+          cargás un gasto o un movimiento de ahorro, y se pinta en rojo si el
+          resultado da negativo.
+        </p>
+        <p key="p3" className="text-sm text-muted-foreground">
+          Por ahora está disponible en el contexto personal (Mis finanzas).
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'instalar-nido-como-app',
     title: 'Instalá Nido como una app en tu celular',
     excerpt:
