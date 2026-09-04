@@ -59,5 +59,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.transferir_a_ahorro(numeric, date, text, uuid, text) from public;
+-- Este proyecto da EXECUTE por default a anon/authenticated en
+-- funciones nuevas (default privileges), no solo vía PUBLIC — hay que
+-- revocar explícitamente de cada rol, no alcanza con "from public".
+revoke execute on function public.transferir_a_ahorro(numeric, date, text, uuid, text) from public, anon;
 grant execute on function public.transferir_a_ahorro(numeric, date, text, uuid, text) to authenticated;
