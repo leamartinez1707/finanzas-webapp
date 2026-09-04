@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, PiggyBank, ArrowDown, ArrowUp, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Wallet, ArrowDown, ArrowUp, Trash2, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { ScreenHeader } from '@/components/screen-header'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import type { SavingsMovement } from '@/lib/types'
 import { showError, showSuccess } from '@/lib/toast'
 
-export default function AhorrosPage() {
+export default function IngresosPage() {
   const {
     isPersonal,
     activeHousehold,
@@ -47,11 +47,11 @@ export default function AhorrosPage() {
       .filter(Boolean)
   }, [isPersonal, activeHousehold, currentUser, members])
 
-  // Savings per member, scoped to current context
+  // Income movements per member, scoped to current context
   const savingsByMember = useMemo(() => {
     const map = new Map<string, SavingsMovement[]>()
     for (const s of savings) {
-      // In household mode, show household scoped savings for that household + personal savings of members
+      // In household mode, show household scoped movements for that household + personal movements of members
       const matches = isPersonal
         ? s.scope === 'personal' && s.memberId === currentUser?.id
         : (s.scope === 'household' && s.householdId === activeHousehold?.id) ||
@@ -151,8 +151,8 @@ export default function AhorrosPage() {
   return (
     <div className="space-y-4">
       <ScreenHeader
-        title="Ahorros"
-        subtitle={isPersonal ? 'Tu ahorro personal' : activeHousehold?.name}
+        title="Ingresos"
+        subtitle={isPersonal ? 'La plata con la que pagás tus gastos' : activeHousehold?.name}
         action={
           <button
               onClick={() => { setAdding(true); setMovType('deposito'); setMovAmount(''); setMovDate(todayLocalISO()); setMovNote(''); setMovError('') }}
@@ -200,7 +200,7 @@ export default function AhorrosPage() {
                       )}
                     />
                     <p className="text-[10px] text-muted-foreground">
-                      {balance >= 0 ? 'ahorrado' : 'saldo negativo'}
+                      {balance >= 0 ? 'disponible' : 'saldo negativo'}
                     </p>
                   </div>
                 </button>
@@ -230,7 +230,7 @@ export default function AhorrosPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium">
-                              {mov.type === 'deposito' ? 'Depósito' : 'Retiro'}
+                              {mov.type === 'deposito' ? 'Ingreso' : 'Retiro'}
                               {mov.note && ` · ${mov.note}`}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
@@ -257,12 +257,12 @@ export default function AhorrosPage() {
         </div>
       ) : (
         <EmptyState
-          icon={PiggyBank}
-          title="Todavía no hay ahorros"
+          icon={Wallet}
+          title="Todavía no hay ingresos"
           description={
             isPersonal
-              ? 'Registrá tu primer depósito para empezar a trackear tu ahorro.'
-              : 'Registren sus ahorros para verlos acá.'
+              ? 'Registrá tu primer ingreso para empezar a ver cuánto tenés disponible.'
+              : 'Registren sus ingresos para verlos acá.'
           }
           action={
             <button
@@ -296,7 +296,7 @@ export default function AhorrosPage() {
               )}
             >
               <ArrowDown className="size-4" />
-              Depósito
+              Ingreso
             </button>
             <button
               type="button"
@@ -373,7 +373,7 @@ export default function AhorrosPage() {
                   Registrando...
                 </span>
               ) : (
-                `Registrar ${movType === 'deposito' ? 'depósito' : 'retiro'}`
+                `Registrar ${movType === 'deposito' ? 'ingreso' : 'retiro'}`
               )}
             </button>
           </div>
@@ -384,7 +384,7 @@ export default function AhorrosPage() {
       <Sheet
         open={!!editing}
         onClose={() => setEditing(undefined)}
-        title={editing?.type === 'deposito' ? 'Editar depósito' : 'Editar retiro'}
+        title={editing?.type === 'deposito' ? 'Editar ingreso' : 'Editar retiro'}
       >
         <form onSubmit={handleUpdate} className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
@@ -399,7 +399,7 @@ export default function AhorrosPage() {
               )}
             >
               <ArrowDown className="size-4" />
-              Depósito
+              Ingreso
             </button>
             <button
               type="button"

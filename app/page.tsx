@@ -105,9 +105,9 @@ export default async function LandingPage() {
               swatch="var(--person-4)"
             />
             <FeatureCard
-              eyebrow="Ahorros personales"
+              eyebrow="Ingresos personales"
               title="Lo tuyo, aparte"
-              detail="Tus gastos y tus ahorros personales no se mezclan con los del hogar."
+              detail="Tus gastos y tus ingresos personales no se mezclan con los del hogar."
               swatch="var(--person-2)"
             />
           </div>

@@ -81,9 +81,9 @@ export function buildActivity(
   for (const s of savings.filter(inScopeSaving)) {
     items.push({
       id: s.id,
-      kind: 'ahorro',
+      kind: 'ingreso',
       memberId: s.memberId,
-      title: s.type === 'deposito' ? 'Depósito a ahorros' : 'Retiro de ahorros',
+      title: s.type === 'deposito' ? 'Ingreso' : 'Retiro de ingresos',
       subtitle: s.note ? `${name(s.memberId)} · ${s.note}` : name(s.memberId),
       amount: s.amount,
       currency: baseCurrency,

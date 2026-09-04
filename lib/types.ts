@@ -145,7 +145,7 @@ export interface SavingsMovement {
   note?: string
 }
 
-export type ActivityKind = 'gasto' | 'aporte' | 'ahorro' | 'pago'
+export type ActivityKind = 'gasto' | 'aporte' | 'ingreso' | 'pago'
 
 export interface ActivityItem {
   id: string

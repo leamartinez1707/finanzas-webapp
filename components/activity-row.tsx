@@ -1,6 +1,6 @@
 'use client'
 
-import { PiggyBank, Target, ArrowDownLeft } from 'lucide-react'
+import { Wallet, Target, ArrowDownLeft } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { CategoryIcon } from '@/components/category-icon'
 import { Money, CurrencyTag } from '@/components/money'
@@ -47,7 +47,7 @@ export function ActivityRow({
           {item.kind === 'aporte' ? (
             <Target className="size-4.5" />
           ) : item.direction === 'in' ? (
-            <PiggyBank className="size-4.5" />
+            <Wallet className="size-4.5" />
           ) : (
             <ArrowDownLeft className="size-4.5" />
           )}
