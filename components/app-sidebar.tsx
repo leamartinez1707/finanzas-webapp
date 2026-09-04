@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Clock3, LayoutGrid, LogOut, PiggyBank, ReceiptText, RefreshCw, Settings2, Target } from 'lucide-react'
+import { Clock3, LayoutGrid, LogOut, Wallet, ReceiptText, RefreshCw, Settings2, Target } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { ContextSwitcher } from '@/components/context-switcher'
 import { useApp } from '@/lib/store'
@@ -15,7 +15,7 @@ export const NAV_ITEMS = [
   { href: '/inicio', label: 'Inicio', icon: LayoutGrid },
   { href: '/gastos', label: 'Gastos', icon: ReceiptText },
   { href: '/objetivos', label: 'Objetivos', icon: Target },
-  { href: '/ahorros', label: 'Ahorros', icon: PiggyBank },
+  { href: '/ingresos', label: 'Ingresos', icon: Wallet },
   { href: '/historial', label: 'Historial', icon: Clock3 },
 ]
 

@@ -113,16 +113,18 @@ export default function InicioPage() {
     .filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id && isThisMonth(e.date))
     .reduce((s, e) => s + e.amount, 0)
 
-  const personalSavings = savings
+  // net income entered (deposits minus withdrawals) — this is the money the
+  // user actually has to cover expenses with, not a separate savings pot
+  const personalIncome = savings
     .filter((s) => s.scope === 'personal' && s.memberId === currentUser?.id)
     .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
 
-  // total ever spent, so we can net it against savings and show what's actually left
+  // total ever spent, so we can net it against income and show what's actually left
   const personalExpensesTotal = expenses
     .filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id && e.currency === activeCurrency)
     .reduce((s, e) => s + e.amount, 0)
 
-  const personalAvailable = personalSavings - personalExpensesTotal
+  const personalAvailable = personalIncome - personalExpensesTotal
 
   const scopedGoals = goals.filter((g) =>
     isPersonal
@@ -188,7 +190,7 @@ export default function InicioPage() {
                     personalAvailable >= 0 ? 'text-positive' : 'text-destructive',
                   )}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Ahorros menos lo gastado</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Ingresos menos lo gastado</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
@@ -200,9 +202,9 @@ export default function InicioPage() {
                   />
                 </div>
                 <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
-                  <p className="text-xs font-medium text-muted-foreground">Ahorros</p>
+                  <p className="text-xs font-medium text-muted-foreground">Ingresos</p>
                   <Money
-                    amount={personalSavings}
+                    amount={personalIncome}
                     currency={activeCurrency}
                     className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-positive"
                   />
@@ -290,7 +292,7 @@ export default function InicioPage() {
             <EmptyState
               icon={Receipt}
               title="Todavía no hay movimientos"
-              description="Cuando registres un gasto, un aporte o un ahorro, va a aparecer acá."
+              description="Cuando registres un gasto, un aporte o un ingreso, va a aparecer acá."
             />
           )}
         </section>

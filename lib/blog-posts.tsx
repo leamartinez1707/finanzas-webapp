@@ -14,6 +14,37 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'ahorros-ahora-es-ingresos',
+    title: '"Ahorros" ahora se llama "Ingresos"',
+    excerpt:
+      'Le cambiamos el nombre a la sección de depósitos y retiros: no era un ahorro aparte, era la plata con la que pagás tus gastos del mes.',
+    date: '2026-09-04',
+    content: (
+      <>
+        <p key="p1">
+          La sección que hasta ahora se llamaba <strong>Ahorros</strong> — donde
+          registrabas depósitos y retiros — en realidad no representaba un
+          ahorro guardado aparte: era la plata que entra (tu sueldo, un
+          ingreso extra) y con la que después pagás los gastos del mes. Llamarla
+          &ldquo;ahorros&rdquo; generaba confusión, así que le cambiamos el
+          nombre a <strong>Ingresos</strong> en todos lados: el menú, el
+          historial y la tarjeta &ldquo;Disponible&rdquo; del inicio.
+        </p>
+        <p key="p2">
+          No cambia nada en tus datos — los depósitos y retiros que ya tenías
+          cargados siguen ahí igual, con los mismos montos y fechas. Solo
+          cambia cómo se llama y se explica en la app.
+        </p>
+        <p key="p3">
+          Un ahorro de verdad — plata que apartás con una meta, separada de lo
+          que gastás — ya existe como <strong>Objetivos</strong>, y estamos
+          pensando si tiene sentido sumar además una sección de ahorro
+          general, sin meta ni fecha. Si te sirve, contanos.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'saldo-disponible',
     title: 'Ahora ves cuánto te queda disponible',
     excerpt:

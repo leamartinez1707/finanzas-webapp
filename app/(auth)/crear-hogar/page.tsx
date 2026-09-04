@@ -45,7 +45,7 @@ export default function CrearHogarPage() {
         <div className="flex flex-1 flex-col">
           <h1 className="text-balance text-3xl font-bold tracking-tight">Creá tu hogar</h1>
           <p className="mt-2 text-pretty leading-relaxed text-muted-foreground">
-            Un espacio para los gastos y ahorros que comparten. Podés cambiar la moneda más
+            Un espacio para los gastos e ingresos que comparten. Podés cambiar la moneda más
             adelante.
           </p>
 
