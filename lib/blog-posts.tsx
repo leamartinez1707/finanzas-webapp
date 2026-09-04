@@ -14,6 +14,36 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'ahorros-de-verdad',
+    title: 'Ahorros, separados de tus ingresos',
+    excerpt:
+      'Nueva sección de Ahorros: plata apartada de verdad, distinta de tus ingresos. Se transfiere en un solo paso, sin cargar dos movimientos sueltos.',
+    date: '2026-09-04',
+    content: (
+      <>
+        <p key="p1">
+          Sumamos <strong>Ahorros</strong> como una sección aparte de{' '}
+          <strong>Ingresos</strong>. La diferencia es simple: Ingresos es la
+          plata con la que pagás tus gastos del mes, y Ahorros es la plata que
+          apartaste — ya no cuenta como disponible para gastar.
+        </p>
+        <p key="p2">
+          Para pasar plata de un lado al otro no hace falta cargar dos
+          movimientos sueltos: en Ahorros hay un botón{' '}
+          <strong>&ldquo;Mover a ahorros&rdquo;</strong> que registra el
+          retiro en Ingresos y el depósito en Ahorros al mismo tiempo, con el
+          mismo monto y fecha. La tarjeta &ldquo;Disponible&rdquo; del inicio
+          ahora solo tiene en cuenta Ingresos — la plata que ahorraste queda
+          afuera, tal como corresponde.
+        </p>
+        <p key="p3" className="text-sm text-muted-foreground">
+          Además de mover plata desde Ingresos, en Ahorros también podés
+          registrar un depósito o retiro directo, igual que en Ingresos.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'ahorros-ahora-es-ingresos',
     title: '"Ahorros" ahora se llama "Ingresos"',
     excerpt:

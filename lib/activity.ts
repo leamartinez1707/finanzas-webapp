@@ -79,11 +79,14 @@ export function buildActivity(
       : s.scope === 'personal' && s.memberId === filter.ownerId
 
   for (const s of savings.filter(inScopeSaving)) {
+    const isAhorro = s.bucket === 'ahorro'
     items.push({
       id: s.id,
-      kind: 'ingreso',
+      kind: isAhorro ? 'ahorro' : 'ingreso',
       memberId: s.memberId,
-      title: s.type === 'deposito' ? 'Ingreso' : 'Retiro de ingresos',
+      title: isAhorro
+        ? (s.type === 'deposito' ? 'Ahorro' : 'Retiro de ahorro')
+        : (s.type === 'deposito' ? 'Ingreso' : 'Retiro de ingresos'),
       subtitle: s.note ? `${name(s.memberId)} · ${s.note}` : name(s.memberId),
       amount: s.amount,
       currency: baseCurrency,

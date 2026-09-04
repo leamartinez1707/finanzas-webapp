@@ -46,6 +46,7 @@ import {
   addSavingsMovement as addSavingsMovementDB,
   updateSavingsMovement as updateSavingsMovementDB,
   deleteSavingsMovement as deleteSavingsMovementDB,
+  transferToSavings as transferToSavingsDB,
   createHousehold as createHouseholdDB,
   updateHousehold as updateHouseholdDB,
   leaveHousehold as leaveHouseholdDB,
@@ -109,6 +110,7 @@ interface AppState {
   addSavings: (m: Omit<SavingsMovement, 'id'>) => Promise<void>
   updateSavings: (id: string, patch: Partial<SavingsMovement>) => Promise<void>
   deleteSavings: (id: string) => Promise<void>
+  transferToSavings: (t: { amount: number; date: string; note?: string }) => Promise<void>
   createHousehold: (name: string, currency: CurrencyCode) => Promise<string>
   addInvite: (householdId: string, email: string) => Promise<{ error?: string }>
   updateInvite: (householdId: string, inviteId: string, status: string) => Promise<void>
@@ -457,6 +459,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteSavings: wrapBusy(async (id) => {
         await deleteSavingsMovementDB(id)
         setSavings((prev) => prev.filter((s) => s.id !== id))
+      }),
+      transferToSavings: wrapBusy(async (t) => {
+        const created = await transferToSavingsDB({
+          amount: t.amount,
+          date: t.date,
+          note: t.note,
+          scope: isPersonal ? 'personal' : 'household',
+          householdId: isPersonal ? undefined : activeHousehold?.id,
+        })
+        setSavings((prev) => [...created, ...prev])
       }),
       createHousehold: wrapBusy(async (name, currency) => {
         const id = await createHouseholdDB(name, currency)

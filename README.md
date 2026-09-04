@@ -30,7 +30,8 @@ Mobile-first, pensada para sesiones rápidas: cargar un gasto en 10 segundos, ch
 - **Gastos recurrentes** — armá una plantilla (alquiler, Internet, gimnasio) y Nido genera el gasto solo cada mes, en el día que definas.
 - **Presupuestos** — poné un tope mensual por categoría. Un indicador visual avisa cuando te acercás (80%) o superás el límite.
 - **Objetivos de ahorro** — del hogar y personales. Con barra de progreso, historial de aportes y moneda editable por objetivo.
-- **Ahorro individual** — cada persona registra depósitos y retiros en su cuenta de ahorro. Transparencia total dentro del hogar.
+- **Ingresos** — cada persona registra los ingresos y retiros con los que paga sus gastos del mes.
+- **Ahorros** — plata apartada, separada de los ingresos. Se puede transferir directo desde Ingresos en un solo paso.
 - **Finanzas personales** — gastos y objetivos privados, separados de cualquier hogar. Funcionan incluso si no pertenecés a ningún hogar.
 - **Dashboard** — resumen con balance entre miembros, objetivos activos, ahorro combinado. Cambia según el contexto (hogar o personal).
 - **Resumen** — total del mes con variación contra el anterior, desglose por categoría y por persona, y exportación a CSV.
@@ -122,7 +123,8 @@ finanzas-compartidas/
 │       ├── inicio/       # Dashboard
 │       ├── gastos/       # Listado + alta de gastos, recurrentes y presupuestos
 │       ├── objetivos/    # Objetivos de ahorro + detalle
-│       ├── ahorros/      # Cuenta de ahorro individual
+│       ├── ingresos/     # Ingresos y retiros con los que se pagan los gastos
+│       ├── ahorros/      # Plata apartada, separada de los ingresos
 │       ├── resumen/      # Totales, por categoría, por persona, export CSV
 │       ├── ajustes/      # Ajustes del hogar, miembros, invitaciones
 │       └── historial/    # Línea de tiempo con filtros

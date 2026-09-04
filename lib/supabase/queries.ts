@@ -111,6 +111,7 @@ function toSavings(row: any): SavingsMovement {
     memberId: row.user_id,
     scope: row.scope ?? 'personal',
     householdId: row.household_id ?? undefined,
+    bucket: (row.bucket as 'ingresos' | 'ahorro') ?? 'ingresos',
     type: row.tipo as 'deposito' | 'retiro',
     amount: Number(row.monto),
     date: row.fecha,
@@ -878,6 +879,7 @@ export async function addSavingsMovement(m: Omit<SavingsMovement, 'id'>): Promis
     user_id: m.memberId,
     scope: m.scope,
     household_id: m.householdId ?? null,
+    bucket: m.bucket,
     tipo: m.type,
     monto: m.amount,
     fecha: m.date,
@@ -904,6 +906,28 @@ export async function deleteSavingsMovement(id: string) {
   const { data, error } = await s.from('savings_movements').delete().eq('id', id).select('id')
   if (!error && !data?.length) throw new Error('No se pudo eliminar el movimiento (sin permiso o ya no existe).')
   if (error) throw error
+}
+
+// Moves money from the 'ingresos' bucket into 'ahorro' in one atomic step —
+// a retiro + a depósito, same amount and date. Returns both new rows so the
+// caller can patch context state directly (see lib/store.tsx).
+export async function transferToSavings(t: {
+  amount: number
+  date: string
+  scope: 'household' | 'personal'
+  householdId?: string
+  note?: string
+}): Promise<SavingsMovement[]> {
+  const s = supabase()
+  const { data, error } = await s.rpc('transferir_a_ahorro', {
+    p_monto: t.amount,
+    p_fecha: t.date,
+    p_scope: t.scope,
+    p_household_id: t.householdId ?? null,
+    p_nota: t.note ?? null,
+  })
+  if (error) throw error
+  return (data ?? []).map(toSavings)
 }
 
 // ─── Invites ────────────────────────────────────────────────────────
