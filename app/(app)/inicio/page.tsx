@@ -134,10 +134,12 @@ export default function InicioPage() {
   // loadData() (lib/store.tsx), así que ya no alcanza para este total.
   const personalIncome = personalSavingsTotals.find((t) => t.bucket === 'ingresos')?.balance ?? 0
 
-  // total ever spent — personal (get_personal_expense_totals) + mi parte en
-  // cada hogar (get_my_household_expense_share_totals), ambos server-side
-  // sobre TODO el historial. A diferencia de monthSpend de arriba, este no
-  // puede salir de `expenses` porque ese array está ventaneado.
+  // total gastado — personal (get_personal_expense_totals) + mi parte en
+  // cada hogar (get_my_household_expense_share_totals), ambos server-side,
+  // y ambos acotados a "desde mi primer movimiento de Ingresos" (no desde
+  // el principio de los tiempos) — si recién empezaste a cargar Ingresos,
+  // no te descuenta gastos de antes de eso. Ver lib/store.tsx y
+  // supabase/migrations/018_history_aggregates_rpc.sql para el porqué.
   const personalExpensesTotal =
     (personalExpenseTotals.find((t) => t.currency === activeCurrency)?.total ?? 0) +
     (householdExpenseShareTotals.find((t) => t.currency === activeCurrency)?.total ?? 0)

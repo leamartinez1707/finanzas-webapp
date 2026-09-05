@@ -113,11 +113,10 @@ interface AppState {
   householdBalances: HouseholdBalanceRow[]
   personalSavingsTotals: SavingsTotal[]
   householdSavingsTotals: HouseholdSavingsTotalRow[]
+  // Para "Disponible" en /inicio: personal + tu parte en cada household,
+  // desde tu primer movimiento de Ingresos (no todo el historial) — ver
+  // get_personal_expense_totals/get_my_household_expense_share_totals.
   personalExpenseTotals: CurrencyTotal[]
-  // Mi parte (expenseShare) de los gastos de TODOS mis households, sumada
-  // por moneda — "Disponible"/"Gasto del mes" en /inicio suman esto a
-  // personalExpenseTotals (ver computeRealSpend en lib/balance.ts para el
-  // desglose por hogar del mes en curso).
   householdExpenseShareTotals: CurrencyTotal[]
   ensureMonthLoaded: (month: MonthCursor) => Promise<void>
   loadFullHistory: () => Promise<void>
@@ -380,11 +379,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         perHousehold.flatMap((r) => r.balances.map((b) => ({ ...b, householdId: r.householdId }))),
       )
       setPersonalSavingsTotals(personalSavingsTotalsData)
+      setPersonalExpenseTotals(personalExpenseTotalsData)
+      setHouseholdExpenseShareTotals(householdExpenseShareTotalsData)
       setHouseholdSavingsTotals(
         perHousehold.flatMap((r) => r.savingsTotals.map((t) => ({ ...t, householdId: r.householdId }))),
       )
-      setPersonalExpenseTotals(personalExpenseTotalsData)
-      setHouseholdExpenseShareTotals(householdExpenseShareTotalsData)
       setPremiumWaitlistEntry(waitlistEntry)
       if (!silent) setLoading(false)
     } catch (error) {

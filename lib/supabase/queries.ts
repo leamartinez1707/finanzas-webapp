@@ -1257,6 +1257,8 @@ export interface CurrencyTotal {
   total: number
 }
 
+// Gastos personales, desde tu primer movimiento de Ingresos (ver
+// get_personal_expense_totals en la migración 018 para el porqué del corte).
 export async function getPersonalExpenseTotals(): Promise<CurrencyTotal[]> {
   const { data, error } = await supabase().rpc('get_personal_expense_totals')
   if (error) throw error
@@ -1264,10 +1266,11 @@ export async function getPersonalExpenseTotals(): Promise<CurrencyTotal[]> {
 }
 
 // Mi parte (no lo que adelanté) de los gastos de TODOS mis households,
-// sumada por moneda, sobre todo el historial — ver
+// sumada por moneda, desde tu primer movimiento de Ingresos — ver
 // get_my_household_expense_share_totals en la migración 018.
 export async function getMyHouseholdExpenseShareTotals(): Promise<CurrencyTotal[]> {
   const { data, error } = await supabase().rpc('get_my_household_expense_share_totals')
   if (error) throw error
   return (data ?? []).map((r: any) => ({ currency: r.currency as CurrencyCode, total: Number(r.total) }))
 }
+

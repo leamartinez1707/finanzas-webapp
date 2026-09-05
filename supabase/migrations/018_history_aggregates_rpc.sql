@@ -277,8 +277,28 @@ $$;
 revoke execute on function public.get_household_savings_totals(uuid) from public, anon;
 grant execute on function public.get_household_savings_totals(uuid) to authenticated;
 
--- ─── get_personal_expense_totals ────────────────────────────────────
--- Para "Disponible" personal en /inicio (personalExpensesTotal).
+-- ─── get_personal_expense_totals / get_my_household_expense_share_totals ──
+-- Para "Disponible" en /inicio: personal + tu parte en cada household,
+-- sobre TODO el historial — pero no desde el principio de los tiempos,
+-- sino desde `ingresos_start` (la fecha de tu primer movimiento de
+-- Ingresos personal). Sin este corte, un usuario que recién empieza a
+-- cargar Ingresos vería restado el gasto de meses en los que ni siquiera
+-- trackeaba su plata acá (ver discusión en el PR: comparar un Ingresos de
+-- un mes contra un historial de gastos del hogar de varios meses no
+-- cierra). El corte es automático por usuario (no una fecha hardcodeada)
+-- y NO se resetea cada mes — evita el bug de "se olvida lo gastado" que
+-- tendría una versión mes a mes.
+--
+-- Importante: esto es solo para el número personal de "Disponible". NO
+-- toca get_household_balances/get_unsettled_expense_ids — la deuda real
+-- entre miembros del hogar (quién pagó, quién debe) sigue calculándose
+-- sobre todo el historial siempre, sin este corte, porque esa deuda es
+-- real independientemente de cuándo cada uno empezó a trackear su propio
+-- presupuesto personal acá.
+--
+-- Si el usuario nunca cargó Ingresos, ingresos_start cae a '1900-01-01'
+-- (se comporta como "todo el historial", no rompe nada).
+
 create or replace function public.get_personal_expense_totals()
 returns table(currency text, total numeric)
 language sql
@@ -288,21 +308,19 @@ set search_path = public
 as $$
   select moneda as currency, sum(monto) as total
   from expenses
-  where scope = 'personal' and user_id = (select auth.uid())
+  where scope = 'personal'
+    and user_id = (select auth.uid())
+    and fecha >= (
+      select coalesce(min(fecha), '1900-01-01'::date)
+      from savings_movements
+      where scope = 'personal' and user_id = (select auth.uid()) and bucket = 'ingresos'
+    )
   group by moneda;
 $$;
 
 revoke execute on function public.get_personal_expense_totals() from public, anon;
 grant execute on function public.get_personal_expense_totals() to authenticated;
 
--- ─── get_my_household_expense_share_totals ──────────────────────────
--- Mi parte (expenseShare, no lo que adelanté) de los gastos de TODOS los
--- households a los que pertenezco, sumada por moneda — para "Disponible"/
--- "Gasto del mes" en /inicio, que cuentan personal + esta parte (ver
--- computeRealSpend en lib/balance.ts, usado ahí solo para el desglose del
--- mes en curso, que sí está siempre en la ventana cargada). Sin esto, el
--- total "todo el historial" volvería a depender del array de expenses
--- ventaneado por loadData().
 create or replace function public.get_my_household_expense_share_totals()
 returns table(currency text, total numeric)
 language plpgsql
@@ -312,7 +330,12 @@ set search_path = public
 as $$
 begin
   return query
-  with my_households as (
+  with ingresos_start as (
+    select coalesce(min(fecha), '1900-01-01'::date) as fecha
+    from savings_movements
+    where scope = 'personal' and user_id = (select auth.uid()) and bucket = 'ingresos'
+  ),
+  my_households as (
     select household_id
     from household_members
     where user_id = (select auth.uid())
@@ -326,7 +349,8 @@ begin
     select e.*
     from expenses e
     join my_households mh on mh.household_id = e.household_id
-    where e.scope = 'household'
+    cross join ingresos_start
+    where e.scope = 'household' and e.fecha >= ingresos_start.fecha
   )
   select
     e.moneda as currency,
