@@ -5,14 +5,16 @@ import { useState, useEffect } from 'react'
 import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell, Loader2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
-import { expenseShare } from '@/lib/balance'
+import { computeRealSpend, expenseShare } from '@/lib/balance'
 import { isThisMonth } from '@/lib/format'
 import { BalanceCard } from '@/components/balance-card'
 import { ActivityRow } from '@/components/activity-row'
 import { GoalCard, goalSaved } from '@/components/goal-card'
 import { Money } from '@/components/money'
+import { OtherCurrencySpendNote } from '@/components/other-currency-spend-note'
 import { PersonAvatar } from '@/components/person-avatar'
 import { SectionTitle } from '@/components/screen-header'
+import { SpendBreakdownNote } from '@/components/spend-breakdown-note'
 import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Field, inputClass } from '@/components/field'
@@ -39,6 +41,7 @@ export default function InicioPage() {
     busy,
     personalSavingsTotals,
     personalExpenseTotals,
+    householdExpenseShareTotals,
     updateProfile,
     setDefaultContext,
     addRepayment,
@@ -110,10 +113,17 @@ export default function InicioPage() {
     scopeFilter,
   ).slice(0, 5)
 
-  // personal month spend
-  const personalMonth = expenses
-    .filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id && isThisMonth(e.date))
-    .reduce((s, e) => s + e.amount, 0)
+  // real spend del mes en curso: gastos personales + mi parte (no lo que
+  // adelanté) de cada hogar al que pertenezco, para que "Gasto del mes" no
+  // ignore la plata que sale del bolsillo como parte de un gasto
+  // compartido. Bucketeado por moneda — se compara contra activeCurrency y
+  // los hogares en otra moneda se muestran aparte, sin mezclar (no hay
+  // conversión de moneda en la app). Client-side sobre `expenses`: el mes
+  // en curso siempre está en la ventana reciente que carga loadData(), así
+  // que no hace falta un RPC para este desglose puntual.
+  const monthSpend = currentUser ? computeRealSpend(expenses, myHouseholds, currentUser.id, isThisMonth) : undefined
+
+  const personalMonth = monthSpend?.totalByCurrency[activeCurrency] ?? 0
 
   // net income entered (deposits minus withdrawals) — this is the money the
   // user actually has to cover expenses with, not a separate savings pot.
@@ -124,11 +134,27 @@ export default function InicioPage() {
   // loadData() (lib/store.tsx), así que ya no alcanza para este total.
   const personalIncome = personalSavingsTotals.find((t) => t.bucket === 'ingresos')?.balance ?? 0
 
-  // total ever spent, so we can net it against income and show what's actually
-  // left — mismo motivo: get_personal_expense_totals, no el array acotado.
-  const personalExpensesTotal = personalExpenseTotals.find((t) => t.currency === activeCurrency)?.total ?? 0
+  // total ever spent — personal (get_personal_expense_totals) + mi parte en
+  // cada hogar (get_my_household_expense_share_totals), ambos server-side
+  // sobre TODO el historial. A diferencia de monthSpend de arriba, este no
+  // puede salir de `expenses` porque ese array está ventaneado.
+  const personalExpensesTotal =
+    (personalExpenseTotals.find((t) => t.currency === activeCurrency)?.total ?? 0) +
+    (householdExpenseShareTotals.find((t) => t.currency === activeCurrency)?.total ?? 0)
 
   const personalAvailable = personalIncome - personalExpensesTotal
+
+  // desglose para "Gasto del mes": personal + mi parte de cada hogar en la
+  // misma moneda que la vista personal
+  const monthContributors = [
+    { label: 'Personal', amount: monthSpend?.personal[activeCurrency] ?? 0 },
+    ...(monthSpend?.households ?? [])
+      .filter((h) => h.currency === activeCurrency)
+      .map((h) => ({ label: h.householdName, amount: h.myShare })),
+  ]
+
+  // hogares en otra moneda: no se netean, se muestran aparte
+  const otherCurrencyMonthSpend = (monthSpend?.households ?? []).filter((h) => h.currency !== activeCurrency)
 
   const scopedGoals = goals.filter((g) =>
     isPersonal
@@ -194,7 +220,11 @@ export default function InicioPage() {
                     personalAvailable >= 0 ? 'text-positive' : 'text-destructive',
                   )}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Ingresos menos lo gastado</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {myHouseholds.length > 0
+                    ? 'Ingresos menos lo gastado (personal y tu parte en cada hogar)'
+                    : 'Ingresos menos lo gastado'}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
@@ -204,6 +234,7 @@ export default function InicioPage() {
                     currency={activeCurrency}
                     className="mt-1.5 block text-[clamp(1.25rem,14cqw,1.875rem)] leading-tight [overflow-wrap:anywhere] text-destructive"
                   />
+                  <SpendBreakdownNote contributors={monthContributors} currency={activeCurrency} />
                 </div>
                 <div className="@container min-w-0 rounded-[28px] border border-border bg-card p-4 sm:p-5">
                   <p className="text-xs font-medium text-muted-foreground">Ingresos</p>
@@ -214,6 +245,7 @@ export default function InicioPage() {
                   />
                 </div>
               </div>
+              <OtherCurrencySpendNote households={otherCurrencyMonthSpend} periodLabel="este mes" />
             </div>
           ) : (
             <BalanceCard />
