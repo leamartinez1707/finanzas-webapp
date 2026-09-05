@@ -1262,3 +1262,12 @@ export async function getPersonalExpenseTotals(): Promise<CurrencyTotal[]> {
   if (error) throw error
   return (data ?? []).map((r: any) => ({ currency: r.currency as CurrencyCode, total: Number(r.total) }))
 }
+
+// Mi parte (no lo que adelanté) de los gastos de TODOS mis households,
+// sumada por moneda, sobre todo el historial — ver
+// get_my_household_expense_share_totals en la migración 018.
+export async function getMyHouseholdExpenseShareTotals(): Promise<CurrencyTotal[]> {
+  const { data, error } = await supabase().rpc('get_my_household_expense_share_totals')
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({ currency: r.currency as CurrencyCode, total: Number(r.total) }))
+}

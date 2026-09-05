@@ -24,6 +24,7 @@ import {
   getPersonalSavingsTotals,
   getHouseholdSavingsTotals,
   getPersonalExpenseTotals,
+  getMyHouseholdExpenseShareTotals,
   type MemberBalanceRow,
   type SavingsTotal,
   type MemberSavingsTotal,
@@ -113,6 +114,11 @@ interface AppState {
   personalSavingsTotals: SavingsTotal[]
   householdSavingsTotals: HouseholdSavingsTotalRow[]
   personalExpenseTotals: CurrencyTotal[]
+  // Mi parte (expenseShare) de los gastos de TODOS mis households, sumada
+  // por moneda — "Disponible"/"Gasto del mes" en /inicio suman esto a
+  // personalExpenseTotals (ver computeRealSpend en lib/balance.ts para el
+  // desglose por hogar del mes en curso).
+  householdExpenseShareTotals: CurrencyTotal[]
   ensureMonthLoaded: (month: MonthCursor) => Promise<void>
   loadFullHistory: () => Promise<void>
   premiumWaitlistEntry: PremiumWaitlistEntry | null
@@ -188,6 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [personalSavingsTotals, setPersonalSavingsTotals] = useState<SavingsTotal[]>([])
   const [householdSavingsTotals, setHouseholdSavingsTotals] = useState<HouseholdSavingsTotalRow[]>([])
   const [personalExpenseTotals, setPersonalExpenseTotals] = useState<CurrencyTotal[]>([])
+  const [householdExpenseShareTotals, setHouseholdExpenseShareTotals] = useState<CurrencyTotal[]>([])
   const [premiumWaitlistEntry, setPremiumWaitlistEntry] = useState<PremiumWaitlistEntry | null>(null)
   const [selectedContext, setSelectedContext] = useState<string>('personal')
   const [busy, setBusy] = useState(false)
@@ -294,6 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         waitlistEntry,
         personalSavingsTotalsData,
         personalExpenseTotalsData,
+        householdExpenseShareTotalsData,
         perHousehold,
       ] = await Promise.all([
           getAllMembers([...allMemberIds]),
@@ -306,6 +314,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           getPremiumWaitlistEntry(),
           getPersonalSavingsTotals(),
           getPersonalExpenseTotals(),
+          getMyHouseholdExpenseShareTotals(),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
@@ -375,6 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         perHousehold.flatMap((r) => r.savingsTotals.map((t) => ({ ...t, householdId: r.householdId }))),
       )
       setPersonalExpenseTotals(personalExpenseTotalsData)
+      setHouseholdExpenseShareTotals(householdExpenseShareTotalsData)
       setPremiumWaitlistEntry(waitlistEntry)
       if (!silent) setLoading(false)
     } catch (error) {
@@ -479,6 +489,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       personalSavingsTotals,
       householdSavingsTotals,
       personalExpenseTotals,
+      householdExpenseShareTotals,
       ensureMonthLoaded,
       loadFullHistory,
       premiumWaitlistEntry,
@@ -735,6 +746,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     personalSavingsTotals,
     householdSavingsTotals,
     personalExpenseTotals,
+    householdExpenseShareTotals,
     ensureMonthLoaded,
     loadFullHistory,
     premiumWaitlistEntry,

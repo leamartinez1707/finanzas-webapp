@@ -290,3 +290,65 @@ $$;
 
 revoke execute on function public.get_personal_expense_totals() from public, anon;
 grant execute on function public.get_personal_expense_totals() to authenticated;
+
+-- ─── get_my_household_expense_share_totals ──────────────────────────
+-- Mi parte (expenseShare, no lo que adelanté) de los gastos de TODOS los
+-- households a los que pertenezco, sumada por moneda — para "Disponible"/
+-- "Gasto del mes" en /inicio, que cuentan personal + esta parte (ver
+-- computeRealSpend en lib/balance.ts, usado ahí solo para el desglose del
+-- mes en curso, que sí está siempre en la ventana cargada). Sin esto, el
+-- total "todo el historial" volvería a depender del array de expenses
+-- ventaneado por loadData().
+create or replace function public.get_my_household_expense_share_totals()
+returns table(currency text, total numeric)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  with my_households as (
+    select household_id
+    from household_members
+    where user_id = (select auth.uid())
+  ),
+  member_count as (
+    select household_id, count(*)::int as n
+    from household_members
+    group by household_id
+  ),
+  hh_expenses as (
+    select e.*
+    from expenses e
+    join my_households mh on mh.household_id = e.household_id
+    where e.scope = 'household'
+  )
+  select
+    e.moneda as currency,
+    sum(
+      case
+        when e.shares is not null then coalesce((
+          select (elem->>'amount')::numeric
+          from jsonb_array_elements(e.shares) elem
+          where elem->>'memberId' = (select auth.uid())::text
+        ), 0)
+        when e.split_snapshot is not null then round(e.monto * coalesce((
+          select (elem->>'percent')::numeric
+          from jsonb_array_elements(e.split_snapshot) elem
+          where elem->>'memberId' = (select auth.uid())::text
+        ), 0) / 100)
+        else case
+          when mc.n > 1 then round(e.monto / mc.n)
+          else e.monto
+        end
+      end
+    ) as total
+  from hh_expenses e
+  join member_count mc on mc.household_id = e.household_id
+  group by e.moneda;
+end;
+$$;
+
+revoke execute on function public.get_my_household_expense_share_totals() from public, anon;
+grant execute on function public.get_my_household_expense_share_totals() to authenticated;
