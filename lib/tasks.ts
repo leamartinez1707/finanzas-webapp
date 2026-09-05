@@ -39,6 +39,20 @@ export interface GroupedTasks {
   upcoming: TaskDayGroup[] // agrupadas por día, ordenadas de más cercano a más lejano
 }
 
+// Cuántas tareas "urgentes" (asignadas a mí, del contexto activo, hoy o
+// atrasadas y sin completar) mostrar como numerito de notificación en el
+// nav — nunca cuenta futuras, ni tareas de otro contexto (personal vs. un
+// household puntual), ni las de otros miembros.
+export function urgentPendingCount(
+  tasks: Task[],
+  filter: { scope: 'personal'; ownerId: string } | { scope: 'household'; householdId: string },
+  userId: string,
+): number {
+  const mine = myTasks(scopedTasks(tasks, filter), userId)
+  const { overdue, today } = groupTasksByDay(mine)
+  return overdue.length + today.filter((t) => !t.completed).length
+}
+
 // Agrupa por fecha límite: atrasadas (pendientes, fecha < hoy — quedan
 // visibles arriba de todo para que no se pierdan), hoy, y futuras por día.
 export function groupTasksByDay(tasks: Task[]): GroupedTasks {

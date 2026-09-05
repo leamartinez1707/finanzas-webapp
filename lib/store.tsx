@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Budget, CurrencyCode, Expense, Goal, Household, Member, PremiumFeatureId, PremiumWaitlistEntry, RecurringExpense, Repayment, SavingsMovement, Task } from './types'
+import type { MonthCursor } from './format'
 import {
   getCurrentUser,
   getMyHouseholds,
@@ -19,6 +20,15 @@ import {
   getSavings,
   getRepayments,
   getAllMembers,
+  getHouseholdBalances,
+  getPersonalSavingsTotals,
+  getHouseholdSavingsTotals,
+  getPersonalExpenseTotals,
+  type MemberBalanceRow,
+  type SavingsTotal,
+  type MemberSavingsTotal,
+  type CurrencyTotal,
+  type DateRange,
   addExpense as addExpenseDB,
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
@@ -66,6 +76,22 @@ import {
 import { showError } from './toast'
 import { monthKey, todayLocalISO } from './format'
 
+// Ventana de historial que carga loadData() para expenses/savings/repayments
+// — los totales que dependen de TODO el historial (saldos, deudas, balances
+// de ahorro) no se ven afectados por esto, se calculan aparte en el
+// servidor (ver householdBalances/*SavingsTotals/*ExpenseTotals más abajo).
+// ensureMonthLoaded/loadFullHistory amplían esta ventana bajo demanda.
+const HISTORY_WINDOW_MONTHS = 12
+
+function defaultHistoryWindowStart(): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() - HISTORY_WINDOW_MONTHS, 1)
+  return d.toISOString().slice(0, 10)
+}
+
+type HouseholdBalanceRow = MemberBalanceRow & { householdId: string }
+type HouseholdSavingsTotalRow = MemberSavingsTotal & { householdId: string }
+
 interface AppState {
   currentUserId: string | null
   loading: boolean
@@ -80,6 +106,15 @@ interface AppState {
   goals: Goal[]
   savings: SavingsMovement[]
   repayments: Repayment[]
+  // Agregados server-side sobre TODO el historial (no acotados por la
+  // ventana que sí limita expenses/savings/repayments arriba) — ver
+  // lib/supabase/queries.ts y supabase/migrations/018_history_aggregates_rpc.sql.
+  householdBalances: HouseholdBalanceRow[]
+  personalSavingsTotals: SavingsTotal[]
+  householdSavingsTotals: HouseholdSavingsTotalRow[]
+  personalExpenseTotals: CurrencyTotal[]
+  ensureMonthLoaded: (month: MonthCursor) => Promise<void>
+  loadFullHistory: () => Promise<void>
   premiumWaitlistEntry: PremiumWaitlistEntry | null
   selectedContext: string
   setSelectedContext: (id: string) => void
@@ -149,10 +184,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [savings, setSavings] = useState<SavingsMovement[]>([])
   const [repayments, setRepayments] = useState<Repayment[]>([])
+  const [householdBalances, setHouseholdBalances] = useState<HouseholdBalanceRow[]>([])
+  const [personalSavingsTotals, setPersonalSavingsTotals] = useState<SavingsTotal[]>([])
+  const [householdSavingsTotals, setHouseholdSavingsTotals] = useState<HouseholdSavingsTotalRow[]>([])
+  const [personalExpenseTotals, setPersonalExpenseTotals] = useState<CurrencyTotal[]>([])
   const [premiumWaitlistEntry, setPremiumWaitlistEntry] = useState<PremiumWaitlistEntry | null>(null)
   const [selectedContext, setSelectedContext] = useState<string>('personal')
   const [busy, setBusy] = useState(false)
   const defaultContextAppliedRef = useRef(false)
+  // No es state porque no necesita disparar un re-render por sí solo —
+  // solo lo leen/escriben loadData()/extendHistoryWindow() para decidir
+  // qué rango pedir. Vive en un ref (no en una var de loadData's closure)
+  // porque loadData tiene deps=[] (identidad estable a propósito, ver
+  // abajo) y necesita leer siempre el valor más reciente, no el de cuando
+  // se creó el callback.
+  const historyWindowStartRef = useRef(defaultHistoryWindowStart())
 
   // Avoid the "flashes personal, then switches to the real household" jump
   // on reload: the initial state above has to stay 'personal' (SSR/first
@@ -226,34 +272,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
         for (const mid of h.memberIds) allMemberIds.add(mid)
       }
       const personalFilter: ExpenseFilter = { scope: 'personal', ownerId: user.id }
+      // Reusa la ventana ya vigente (si extendHistoryWindow ya la amplió
+      // por navegación a un mes viejo) en vez de resetearla a los últimos
+      // HISTORY_WINDOW_MONTHS en cada refresh() — si no, un refresh
+      // silencioso disparado por una mutación haría "desaparecer" los
+      // datos viejos que el usuario ya había cargado.
+      const range: DateRange = { from: historyWindowStartRef.current }
 
       // Everything below is independent — fire it all in parallel instead
       // of one giant sequential chain, so a single slow/failing request
       // doesn't stretch out the window where a mid-flight token refresh
       // can take the whole load down.
-      const [allProfs, personalExpenses, personalRecurring, personalBudgets, personalTasks, personalGoals, personalSavings, waitlistEntry, perHousehold] =
-        await Promise.all([
+      const [
+        allProfs,
+        personalExpenses,
+        personalRecurring,
+        personalBudgets,
+        personalTasks,
+        personalGoals,
+        personalSavings,
+        waitlistEntry,
+        personalSavingsTotalsData,
+        personalExpenseTotalsData,
+        perHousehold,
+      ] = await Promise.all([
           getAllMembers([...allMemberIds]),
-          getExpenses(personalFilter),
+          getExpenses(personalFilter, range),
           getRecurringExpenses(personalFilter),
           getBudgets(personalFilter),
           getTasks(personalFilter),
           getGoals(personalFilter),
-          getSavings(personalFilter, [user.id]),
+          getSavings(personalFilter, [user.id], range),
           getPremiumWaitlistEntry(),
+          getPersonalSavingsTotals(),
+          getPersonalExpenseTotals(),
           Promise.all(
             hh.map(async (h) => {
               const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
-              const [exp, rec, bud, tasks, goals, sav, rep] = await Promise.all([
-                getExpenses(hhFilter),
+              const [exp, rec, bud, tasks, goals, sav, rep, balances, savingsTotals] = await Promise.all([
+                getExpenses(hhFilter, range),
                 getRecurringExpenses(hhFilter),
                 getBudgets(hhFilter),
                 getTasks(hhFilter),
                 getGoals(hhFilter),
-                getSavings(hhFilter, h.memberIds),
-                getRepayments(h.id),
+                getSavings(hhFilter, h.memberIds, range),
+                getRepayments(h.id, range),
+                getHouseholdBalances(h.id),
+                getHouseholdSavingsTotals(h.id),
               ])
-              return { exp, rec, bud, tasks, goals, sav, rep }
+              return { exp, rec, bud, tasks, goals, sav, rep, balances, savingsTotals, householdId: h.id }
             }),
           ),
         ])
@@ -300,6 +367,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoals([...personalGoals, ...perHousehold.flatMap((r) => r.goals)])
       setSavings([...personalSavings, ...perHousehold.flatMap((r) => r.sav)])
       setRepayments(perHousehold.flatMap((r) => r.rep))
+      setHouseholdBalances(
+        perHousehold.flatMap((r) => r.balances.map((b) => ({ ...b, householdId: r.householdId }))),
+      )
+      setPersonalSavingsTotals(personalSavingsTotalsData)
+      setHouseholdSavingsTotals(
+        perHousehold.flatMap((r) => r.savingsTotals.map((t) => ({ ...t, householdId: r.householdId }))),
+      )
+      setPersonalExpenseTotals(personalExpenseTotalsData)
       setPremiumWaitlistEntry(waitlistEntry)
       if (!silent) setLoading(false)
     } catch (error) {
@@ -309,6 +384,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
       throw error
     }
   }, [])
+
+  // Amplía la ventana de historial hacia atrás trayendo solo el delta
+  // [newStart, ventana actual) — no vuelve a pedir lo que ya está en
+  // memoria. Los totales agregados (householdBalances, *SavingsTotals,
+  // *ExpenseTotals) no se tocan acá: ya son sobre todo el historial y no
+  // dependen de la ventana.
+  const extendHistoryWindow = useCallback(
+    async (newStart: string) => {
+      if (!currentUserId) return
+      const currentStart = historyWindowStartRef.current
+      if (newStart >= currentStart) return
+
+      const range: DateRange = { from: newStart, to: currentStart }
+      const personalFilter: ExpenseFilter = { scope: 'personal', ownerId: currentUserId }
+
+      const [olderPersonalExpenses, olderPersonalSavings, perHousehold] = await Promise.all([
+        getExpenses(personalFilter, range),
+        getSavings(personalFilter, [currentUserId], range),
+        Promise.all(
+          households.map(async (h) => {
+            const hhFilter: ExpenseFilter = { scope: 'household', householdId: h.id }
+            const [exp, sav, rep] = await Promise.all([
+              getExpenses(hhFilter, range),
+              getSavings(hhFilter, h.memberIds, range),
+              getRepayments(h.id, range),
+            ])
+            return { exp, sav, rep }
+          }),
+        ),
+      ])
+
+      historyWindowStartRef.current = newStart
+      setExpenses((prev) => [...prev, ...olderPersonalExpenses, ...perHousehold.flatMap((r) => r.exp)])
+      setSavings((prev) => [...prev, ...olderPersonalSavings, ...perHousehold.flatMap((r) => r.sav)])
+      setRepayments((prev) => [...prev, ...perHousehold.flatMap((r) => r.rep)])
+    },
+    [currentUserId, households],
+  )
+
+  // Si el mes pedido ya cae dentro de la ventana cargada, no hace nada.
+  const ensureMonthLoaded = useCallback(
+    (month: MonthCursor) => {
+      const neededStart = `${month.year}-${String(month.month + 1).padStart(2, '0')}-01`
+      if (neededStart >= historyWindowStartRef.current) return Promise.resolve()
+      return extendHistoryWindow(neededStart)
+    },
+    [extendHistoryWindow],
+  )
+
+  const loadFullHistory = useCallback(() => extendHistoryWindow('1900-01-01'), [extendHistoryWindow])
 
   useEffect(() => {
     let cancelled = false
@@ -350,6 +475,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       goals,
       savings,
       repayments,
+      householdBalances,
+      personalSavingsTotals,
+      householdSavingsTotals,
+      personalExpenseTotals,
+      ensureMonthLoaded,
+      loadFullHistory,
       premiumWaitlistEntry,
       selectedContext,
       setSelectedContext,
@@ -364,16 +495,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addExpense: wrapBusy(async (e) => {
         const created = await addExpenseDB(e)
         setExpenses((prev) => [created, ...prev])
+        // Los totales agregados (householdBalances, Disponible) se
+        // recalculan en el servidor — este gasto los deja "stale" hasta
+        // que se reconcilien con un reload silencioso.
+        void loadData({ silent: true }).catch(() => {})
       }),
       updateExpense: wrapBusy(async (id, patch) => {
         await updateExpenseDB(id, patch)
         setExpenses((prev) =>
           prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
         )
+        void loadData({ silent: true }).catch(() => {})
       }),
       deleteExpense: wrapBusy(async (id) => {
         await deleteExpenseDB(id)
         setExpenses((prev) => prev.filter((e) => e.id !== id))
+        void loadData({ silent: true }).catch(() => {})
       }),
       addRecurringExpense: wrapBusy(async (r) => {
         const created = await addRecurringExpenseDB(r)
@@ -432,14 +569,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addRepayment: wrapBusy(async (r) => {
         const created = await addRepaymentDB(r)
         setRepayments((prev) => [created, ...prev])
+        void loadData({ silent: true }).catch(() => {})
       }),
       updateRepayment: wrapBusy(async (id, patch) => {
         await updateRepaymentDB(id, patch)
         setRepayments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+        void loadData({ silent: true }).catch(() => {})
       }),
       deleteRepayment: wrapBusy(async (id) => {
         await deleteRepaymentDB(id)
         setRepayments((prev) => prev.filter((r) => r.id !== id))
+        void loadData({ silent: true }).catch(() => {})
       }),
       addContribution: wrapBusy(async (goalId, memberId, amount, date) => {
         const created = await addContributionDB(goalId, memberId, amount, date)
@@ -477,16 +617,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addSavings: wrapBusy(async (m) => {
         const created = await addSavingsMovementDB(m)
         setSavings((prev) => [created, ...prev])
+        void loadData({ silent: true }).catch(() => {})
       }),
       updateSavings: wrapBusy(async (id, patch) => {
         await updateSavingsMovementDB(id, patch)
         setSavings((prev) =>
           prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         )
+        void loadData({ silent: true }).catch(() => {})
       }),
       deleteSavings: wrapBusy(async (id) => {
         await deleteSavingsMovementDB(id)
         setSavings((prev) => prev.filter((s) => s.id !== id))
+        void loadData({ silent: true }).catch(() => {})
       }),
       transferToSavings: wrapBusy(async (t) => {
         const created = await transferToSavingsDB({
@@ -497,6 +640,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           householdId: isPersonal ? undefined : activeHousehold?.id,
         })
         setSavings((prev) => [...created, ...prev])
+        void loadData({ silent: true }).catch(() => {})
       }),
       createHousehold: wrapBusy(async (name, currency) => {
         const id = await createHouseholdDB(name, currency)
@@ -587,6 +731,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     goals,
     savings,
     repayments,
+    householdBalances,
+    personalSavingsTotals,
+    householdSavingsTotals,
+    personalExpenseTotals,
+    ensureMonthLoaded,
+    loadFullHistory,
     premiumWaitlistEntry,
     selectedContext,
     loadData,

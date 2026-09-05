@@ -3,16 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import { useApp } from '@/lib/store'
-import { expenseShare, unsettledExpenseIds } from '@/lib/balance'
+import { expenseShare } from '@/lib/balance'
+import { getUnsettledExpenseIds, getExpensesByIds } from '@/lib/supabase/queries'
 import { CurrencySelect } from '@/components/currency-select'
 import { Field, inputClass } from '@/components/field'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Money } from '@/components/money'
 import { todayLocalISO } from '@/lib/format'
+import { showError } from '@/lib/toast'
 import type { CurrencyCode, Member, Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const EXPENSE_RESULTS_LIMIT = 5
+const EMPTY_UNSETTLED_IDS: ReadonlySet<string> = new Set()
 
 export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }: {
   initial?: Repayment
@@ -40,11 +43,61 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
   // es el gasto que este pago ya tenía asociado al editar: ese se mantiene
   // visible aunque la cuenta ya lo dé por cubierto, para no perder la
   // selección de abajo del usuario.
-  const unsettledIds = fromId && toId
-    ? unsettledExpenseIds(householdExpenses, householdRepayments, fromId, toId, currency, householdMembers.length)
-    : new Set<string>()
-  const compatibleExpenses = householdExpenses.filter((e) =>
-    e.currency === currency && (unsettledIds.has(e.id) || e.id === initial?.expenseId),
+  //
+  // Se calcula en el servidor (get_unsettled_expense_ids), no client-side
+  // sobre householdExpenses/householdRepayments — esos arrays están
+  // acotados a la ventana reciente que carga loadData() (lib/store.tsx),
+  // y una deuda vieja fuera de esa ventana debe poder seguir encontrando
+  // su gasto igual.
+  const [unsettledIds, setUnsettledIds] = useState<Set<string>>(new Set())
+  const [loadingUnsettled, setLoadingUnsettled] = useState(false)
+  const canSearchUnsettled = Boolean(activeHousehold && fromId && toId)
+  // Sin setState en la rama "no aplica" — evita el reset síncrono dentro del
+  // efecto; el valor stale de unsettledIds simplemente se ignora abajo
+  // (effectiveUnsettledIds) hasta que haya household/fromId/toId de nuevo.
+  const effectiveUnsettledIds = canSearchUnsettled ? unsettledIds : EMPTY_UNSETTLED_IDS
+
+  useEffect(() => {
+    if (!activeHousehold || !fromId || !toId) return
+    let cancelled = false
+    setLoadingUnsettled(true)
+    getUnsettledExpenseIds(activeHousehold.id, fromId, toId, currency)
+      .then((ids) => { if (!cancelled) setUnsettledIds(ids) })
+      .catch((error) => { if (!cancelled) showError(error) })
+      .finally(() => { if (!cancelled) setLoadingUnsettled(false) })
+    return () => { cancelled = true }
+  }, [activeHousehold, fromId, toId, currency])
+
+  // get_unsettled_expense_ids devuelve ids de TODO el historial, pero
+  // householdExpenses puede no tener el gasto si es más viejo que la
+  // ventana cargada por loadData() — se traen aparte los que falten, para
+  // que una deuda vieja siga siendo encontrable acá. `expenses` (no el
+  // filtrado householdExpenses, que es un array nuevo cada render) es la
+  // dependencia correcta: solo cambia cuando el Context realmente se
+  // actualiza.
+  // Sin reset a [] cuando `missing` queda vacío: un extraExpenses stale de
+  // un fromId/toId anterior es inofensivo — compatibleExpenses más abajo lo
+  // filtra igual por effectiveUnsettledIds, así que no hace falta el
+  // setState síncrono en esa rama.
+  const [extraExpenses, setExtraExpenses] = useState<typeof householdExpenses>([])
+  useEffect(() => {
+    const missing = [...effectiveUnsettledIds].filter((id) => !expenses.some((e) => e.id === id))
+    if (!missing.length) return
+    let cancelled = false
+    getExpensesByIds(missing)
+      .then((rows) => { if (!cancelled) setExtraExpenses(rows) })
+      .catch((error) => { if (!cancelled) showError(error) })
+    return () => { cancelled = true }
+  }, [effectiveUnsettledIds, expenses])
+
+  const knownExpenses = useMemo(() => {
+    if (!extraExpenses.length) return householdExpenses
+    const extra = extraExpenses.filter((e) => !householdExpenses.some((he) => he.id === e.id))
+    return [...householdExpenses, ...extra]
+  }, [householdExpenses, extraExpenses])
+
+  const compatibleExpenses = knownExpenses.filter((e) =>
+    e.currency === currency && (effectiveUnsettledIds.has(e.id) || e.id === initial?.expenseId),
   )
 
   const filteredExpenses = useMemo(() => {
@@ -133,7 +186,10 @@ export function RepaymentForm({ initial, prefill, onSubmit, onCancel, onDelete }
       {expenseOpen && hasMoreExpenses && (
         <p className="text-xs text-muted-foreground">Hay más gastos — escribí para buscar.</p>
       )}
-      {expenseOpen && compatibleExpenses.length === 0 && (
+      {expenseOpen && canSearchUnsettled && loadingUnsettled && (
+        <p className="text-xs text-muted-foreground">Buscando gastos pendientes...</p>
+      )}
+      {expenseOpen && !(canSearchUnsettled && loadingUnsettled) && compatibleExpenses.length === 0 && (
         <p className="text-xs text-muted-foreground">No hay gastos pendientes entre estas dos personas en esta moneda.</p>
       )}
     </div>

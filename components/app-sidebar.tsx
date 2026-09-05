@@ -21,7 +21,7 @@ import { useApp } from "@/lib/store";
 import { signOut } from "@/lib/supabase/queries";
 import { showError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { myTasks } from "@/lib/tasks";
+import { urgentPendingCount } from "@/lib/tasks";
 
 // `primary` marks the items that get their own icon in the mobile bottom
 // nav (limited real estate — 5 slots incl. "Más"); the rest live inside the
@@ -39,7 +39,7 @@ export const NAV_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isPersonal, refresh, tasks, currentUserId } = useApp();
+  const { isPersonal, refresh, tasks, currentUserId, activeHousehold, currentUser } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   async function handleRefresh() {
@@ -54,9 +54,17 @@ export function AppSidebar() {
     }
   }
 
-  const personalTasksCount = myTasks(tasks, currentUserId!).filter(
-    (t) => !t.completed,
-  ).length;
+  // Solo tareas del contexto activo (personal o el household actual) — no
+  // todas las de cualquier household mezcladas — y solo hoy + atrasadas.
+  const taskBadge = currentUser
+    ? urgentPendingCount(
+        tasks,
+        isPersonal
+          ? { scope: "personal", ownerId: currentUser.id }
+          : { scope: "household", householdId: activeHousehold?.id ?? "" },
+        currentUserId!,
+      )
+    : 0;
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/70 px-4 py-5 lg:flex">
       <div className="px-2">
@@ -93,12 +101,14 @@ export function AppSidebar() {
                     aria-hidden
                   />
                   {item.label}
-                  {item.href === "/tareas" ? (
-                    // Mostrar las tareas y la cantidad de tareas, como si fuese un badge de notificaciones
-                    <span className="flex size-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                      {personalTasksCount}
+                  {item.href === "/tareas" && taskBadge > 0 && (
+                    // Cantidad de tareas urgentes (hoy + atrasadas) del
+                    // contexto activo, tipo badge de notificaciones — oculto
+                    // en 0, capeado en "9+" (ver NavBadge, mismo criterio).
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                      {taskBadge > 9 ? "9+" : taskBadge}
                     </span>
-                  ) : null}
+                  )}
                 </Link>
               </li>
             );

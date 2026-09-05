@@ -376,7 +376,29 @@ export type ExpenseFilter =
   | { scope: 'personal'; ownerId: string }
   | { scope: 'household'; householdId: string }
 
-export async function getExpenses(filter: ExpenseFilter): Promise<Expense[]> {
+// Ventana de fecha opcional para las queries "históricas" (expenses,
+// savings, repayments) — las únicas que loadData() acota, porque los
+// totales/saldos que dependen de todo el historial se calculan aparte
+// en el servidor (ver get_household_balances y compañía más abajo).
+// `from`/`to` son ISO yyyy-mm-dd, inclusive.
+export interface DateRange {
+  from?: string
+  to?: string
+}
+
+// Trae expenses puntuales por id, sin importar la ventana de historial —
+// usado por RepaymentForm cuando get_unsettled_expense_ids devuelve el id
+// de una deuda vieja que loadData() no tiene en memoria (fuera de la
+// ventana reciente). RLS sigue aplicando fila por fila, así que solo
+// devuelve las que el usuario ya podría ver de todos modos.
+export async function getExpensesByIds(ids: string[]): Promise<Expense[]> {
+  if (!ids.length) return []
+  const { data, error } = await supabase().from('expenses').select('*').in('id', ids)
+  if (error) throw error
+  return (data ?? []).map(toExpense)
+}
+
+export async function getExpenses(filter: ExpenseFilter, range?: DateRange): Promise<Expense[]> {
   const s = supabase()
   let query = s.from('expenses').select('*').order('fecha', { ascending: false })
 
@@ -385,6 +407,8 @@ export async function getExpenses(filter: ExpenseFilter): Promise<Expense[]> {
   } else {
     query = query.eq('scope', 'household').eq('household_id', filter.householdId)
   }
+  if (range?.from) query = query.gte('fecha', range.from)
+  if (range?.to) query = query.lte('fecha', range.to)
 
   const { data, error } = await query
   if (error) throw error
@@ -755,8 +779,11 @@ export async function leavePremiumWaitlist() {
   if (!data?.length) throw new Error('No se pudo salir de la lista de espera.')
 }
 
-export async function getRepayments(householdId: string): Promise<Repayment[]> {
-  const { data, error } = await supabase().from('repayments').select('*').eq('household_id', householdId).order('date', { ascending: false })
+export async function getRepayments(householdId: string, range?: DateRange): Promise<Repayment[]> {
+  let query = supabase().from('repayments').select('*').eq('household_id', householdId).order('date', { ascending: false })
+  if (range?.from) query = query.gte('date', range.from)
+  if (range?.to) query = query.lte('date', range.to)
+  const { data, error } = await query
   if (error) throw error
   return (data ?? []).map(toRepayment)
 }
@@ -933,6 +960,7 @@ export async function deleteContribution(id: string) {
 export async function getSavings(
   filter: ExpenseFilter,
   memberIds: string[],
+  range?: DateRange,
 ): Promise<SavingsMovement[]> {
   const s = supabase()
   let query = s.from('savings_movements').select('*').order('fecha', { ascending: false })
@@ -945,6 +973,8 @@ export async function getSavings(
       .eq('household_id', filter.householdId)
       .in('user_id', memberIds)
   }
+  if (range?.from) query = query.gte('fecha', range.from)
+  if (range?.to) query = query.lte('fecha', range.to)
 
   const { data, error } = await query
   if (error) throw error
@@ -1147,4 +1177,88 @@ export async function getAllMembers(userIds: string[]): Promise<Member[]> {
   const { data, error } = await s.from('profiles').select('*').in('id', userIds)
   if (error) throw error
   return (data ?? []).map(toMember)
+}
+
+// ─── Agregados server-side (balances/totales) ───────────────────────
+// Equivalentes SQL de lib/balance.ts, calculados sobre TODO el
+// historial en el servidor (ver 018_history_aggregates_rpc.sql) —
+// necesarios porque loadData() ya no trae expenses/repayments/savings
+// completos, solo una ventana reciente.
+
+export interface MemberBalanceRow {
+  memberId: string
+  currency: CurrencyCode
+  paid: number
+  share: number
+  outgoing: number
+  incoming: number
+  net: number
+}
+
+export async function getHouseholdBalances(householdId: string): Promise<MemberBalanceRow[]> {
+  const { data, error } = await supabase().rpc('get_household_balances', { p_household_id: householdId })
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({
+    memberId: r.member_id,
+    currency: r.currency as CurrencyCode,
+    paid: Number(r.paid),
+    share: Number(r.share),
+    outgoing: Number(r.outgoing),
+    incoming: Number(r.incoming),
+    net: Number(r.net),
+  }))
+}
+
+// Ids de expenses de `creditorId` que `debtorId` todavía no saldó,
+// tratando la deuda como cuenta corriente (mismo criterio que tenía
+// unsettledExpenseIds en lib/balance.ts, ahora calculado en SQL sobre
+// todo el historial, sin importar la ventana cargada en el cliente).
+export async function getUnsettledExpenseIds(
+  householdId: string,
+  debtorId: string,
+  creditorId: string,
+  currency: CurrencyCode,
+): Promise<Set<string>> {
+  const { data, error } = await supabase().rpc('get_unsettled_expense_ids', {
+    p_household_id: householdId,
+    p_debtor_id: debtorId,
+    p_creditor_id: creditorId,
+    p_currency: currency,
+  })
+  if (error) throw error
+  return new Set((data ?? []).map((r: any) => r.expense_id as string))
+}
+
+export interface SavingsTotal {
+  bucket: 'ingresos' | 'ahorro'
+  balance: number
+}
+
+export async function getPersonalSavingsTotals(): Promise<SavingsTotal[]> {
+  const { data, error } = await supabase().rpc('get_personal_savings_totals')
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({ bucket: r.bucket, balance: Number(r.balance) }))
+}
+
+export interface MemberSavingsTotal {
+  memberId: string
+  bucket: 'ingresos' | 'ahorro'
+  balance: number
+}
+
+export async function getHouseholdSavingsTotals(householdId: string): Promise<MemberSavingsTotal[]> {
+  const { data, error } = await supabase().rpc('get_household_savings_totals', { p_household_id: householdId })
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({ memberId: r.user_id, bucket: r.bucket, balance: Number(r.balance) }))
+}
+
+export interface CurrencyTotal {
+  currency: CurrencyCode
+  total: number
+}
+
+export async function getPersonalExpenseTotals(): Promise<CurrencyTotal[]> {
+  const { data, error } = await supabase().rpc('get_personal_expense_totals')
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({ currency: r.currency as CurrencyCode, total: Number(r.total) }))
 }

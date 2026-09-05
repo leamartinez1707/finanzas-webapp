@@ -37,6 +37,8 @@ export default function InicioPage() {
     repayments,
     myHouseholds,
     busy,
+    personalSavingsTotals,
+    personalExpenseTotals,
     updateProfile,
     setDefaultContext,
     addRepayment,
@@ -116,15 +118,15 @@ export default function InicioPage() {
   // net income entered (deposits minus withdrawals) — this is the money the
   // user actually has to cover expenses with, not a separate savings pot.
   // Only the 'ingresos' bucket counts here — money moved to 'ahorro' is set
-  // aside on purpose and shouldn't count as available.
-  const personalIncome = savings
-    .filter((s) => s.bucket === 'ingresos' && s.scope === 'personal' && s.memberId === currentUser?.id)
-    .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
+  // aside on purpose and shouldn't count as available. Calculado en el
+  // servidor sobre TODO el historial (get_personal_savings_totals) — el
+  // array `savings` de arriba está acotado a la ventana reciente que carga
+  // loadData() (lib/store.tsx), así que ya no alcanza para este total.
+  const personalIncome = personalSavingsTotals.find((t) => t.bucket === 'ingresos')?.balance ?? 0
 
-  // total ever spent, so we can net it against income and show what's actually left
-  const personalExpensesTotal = expenses
-    .filter((e) => e.scope === 'personal' && e.ownerId === currentUser?.id && e.currency === activeCurrency)
-    .reduce((s, e) => s + e.amount, 0)
+  // total ever spent, so we can net it against income and show what's actually
+  // left — mismo motivo: get_personal_expense_totals, no el array acotado.
+  const personalExpensesTotal = personalExpenseTotals.find((t) => t.currency === activeCurrency)?.total ?? 0
 
   const personalAvailable = personalIncome - personalExpensesTotal
 

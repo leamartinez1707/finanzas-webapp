@@ -7,8 +7,9 @@ import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/sheet";
 import { NAV_ITEMS } from "@/components/app-sidebar";
+import { NavBadge } from "@/components/nav-badge";
 import { useApp } from "@/lib/store";
-import { myTasks } from "@/lib/tasks";
+import { urgentPendingCount } from "@/lib/tasks";
 
 const primaryItems = NAV_ITEMS.filter((item) => item.primary);
 const moreItems = NAV_ITEMS.filter((item) => !item.primary);
@@ -21,11 +22,19 @@ export function BottomNav() {
     pathname === href || pathname.startsWith(href + "/");
   const moreActive = moreItems.some((item) => isActive(item.href));
 
-  const { tasks, currentUserId } = useApp();
+  const { tasks, currentUserId, isPersonal, activeHousehold, currentUser } = useApp();
 
-  const personalTasksCount = myTasks(tasks, currentUserId!).filter(
-    (t) => !t.completed,
-  ).length;
+  // Solo tareas del contexto activo (personal o el household actual) — no
+  // todas las de cualquier household mezcladas — y solo hoy + atrasadas.
+  const taskBadge = currentUser
+    ? urgentPendingCount(
+        tasks,
+        isPersonal
+          ? { scope: "personal", ownerId: currentUser.id }
+          : { scope: "household", householdId: activeHousehold?.id ?? "" },
+        currentUserId!,
+      )
+    : 0;
 
   return (
     <>
@@ -55,12 +64,7 @@ export function BottomNav() {
                       active && "bg-primary/12",
                     )}
                   >
-                    {item.href === "/tareas" ? (
-                      // Mostrar las tareas y la cantidad de tareas, como si fuese un badge de notificaciones
-                      <span className="absolute -top-2 -right-1 mt-1 mr-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                        {personalTasksCount}
-                      </span>
-                    ) : null}
+                    {item.href === "/tareas" && <NavBadge count={taskBadge} />}
                     <Icon className="size-4.5" strokeWidth={active ? 2.5 : 2} />
                   </span>
                   {item.label}
