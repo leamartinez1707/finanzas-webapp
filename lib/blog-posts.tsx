@@ -14,6 +14,42 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'disponible-incluye-hogares',
+    title: 'Disponible y Gasto del mes ahora incluyen tu parte en los hogares',
+    excerpt:
+      'Lo que gastás como tu parte de un hogar compartido es plata real que sale de tu bolsillo — ahora se ve reflejado en tu vista personal, sin que tengas que cargarlo dos veces.',
+    date: '2026-09-05',
+    content: (
+      <>
+        <p key="p1">
+          Hasta ahora, <strong>Disponible</strong> y <strong>Gasto del mes</strong> en
+          tu vista personal solo miraban tus gastos personales — los que no
+          pertenecen a ningún hogar. El problema: si compartís gastos con tu
+          pareja, tu familia o roommates, tu parte de esos gastos también sale
+          de tu bolsillo, y antes esa plata era invisible en tus finanzas
+          personales.
+        </p>
+        <p key="p2">
+          No hacía falta cargar esos gastos dos veces (una en el hogar y otra
+          como personal) — eso los iba a desincronizar apenas alguien los
+          edite o borre del lado del hogar. En cambio, ahora la app calcula tu
+          parte automáticamente a partir de los gastos de cada hogar del que
+          formás parte, con el mismo cálculo de reparto que ya usa el balance
+          del hogar (montos manuales, porcentajes o partes iguales, según
+          corresponda a cada gasto).
+        </p>
+        <p key="p3">
+          Para que el número no sea una caja negra, <strong>Gasto del mes</strong>{' '}
+          ahora muestra debajo el detalle: cuánto es personal y cuánto es tu
+          parte en cada hogar. Si alguno de tus hogares usa una moneda
+          distinta a la tuya, esa parte se muestra aparte — no se puede sumar
+          automáticamente sin un tipo de cambio, así que preferimos mostrarla
+          bien clara en vez de mezclarla.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'ahorros-ahora-es-ingresos',
     title: '"Ahorros" ahora se llama "Ingresos"',
     excerpt:

@@ -1,5 +1,5 @@
 import { parseLocalDate } from './format'
-import type { CurrencyCode, Expense, Member, Repayment } from './types'
+import type { CurrencyCode, Expense, Household, Member, Repayment } from './types'
 
 export interface MemberBalance {
   memberId: string
@@ -108,6 +108,54 @@ export function sumByCurrency<T extends { amount: number; currency: CurrencyCode
     result[item.currency] = (result[item.currency] ?? 0) + item.amount
   }
   return result
+}
+
+export interface HouseholdSpendShare {
+  householdId: string
+  householdName: string
+  currency: CurrencyCode
+  myShare: number
+}
+
+export interface RealSpendBreakdown {
+  personal: Partial<Record<CurrencyCode, number>>
+  households: HouseholdSpendShare[] // solo hogares con algún gasto en el período
+  totalByCurrency: Partial<Record<CurrencyCode, number>> // personal + mi parte de cada hogar, por moneda
+}
+
+// Cuánto gastó de verdad el usuario en un período: sus gastos personales +
+// su parte (no lo que adelantó) de los gastos de cada hogar al que
+// pertenece. Reutiliza expenseShare() por gasto, así que los overrides
+// manuales, el splitSnapshot congelado y el reparto parejo 1/N se respetan
+// exactamente igual que en el balance del hogar. Bucketea por moneda y nunca
+// las mezcla — no hay conversión de moneda en ningún lado de la app.
+export function computeRealSpend(
+  expenses: Expense[],
+  households: Household[],
+  currentUserId: string,
+  matchesPeriod: (dateIso: string) => boolean = () => true,
+): RealSpendBreakdown {
+  const personal = sumByCurrency(
+    expenses.filter((e) => e.scope === 'personal' && e.ownerId === currentUserId && matchesPeriod(e.date)),
+  )
+
+  const householdShares: HouseholdSpendShare[] = households
+    .map((h) => {
+      const hExpenses = expenses.filter(
+        (e) => e.scope === 'household' && e.householdId === h.id && matchesPeriod(e.date),
+      )
+      const myShare = hExpenses.reduce((sum, e) => sum + expenseShare(e, currentUserId, h.memberIds.length), 0)
+      return { householdId: h.id, householdName: h.name, currency: h.currency, myShare, hasExpenses: hExpenses.length > 0 }
+    })
+    .filter((h) => h.hasExpenses)
+    .map(({ hasExpenses, ...rest }) => rest)
+
+  const totalByCurrency: Partial<Record<CurrencyCode, number>> = { ...personal }
+  for (const h of householdShares) {
+    totalByCurrency[h.currency] = (totalByCurrency[h.currency] ?? 0) + h.myShare
+  }
+
+  return { personal, households: householdShares, totalByCurrency }
 }
 
 // Greedy settlement: minimize transfers
