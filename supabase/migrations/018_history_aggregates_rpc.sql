@@ -70,7 +70,7 @@ begin
   currencies as (
     select moneda as currency from hh_expenses
     union
-    select currency from hh_repayments
+    select hh_repayments.currency from hh_repayments
   ),
   paid_totals as (
     select payer_id as member_id, moneda as currency, sum(monto) as paid
@@ -100,20 +100,24 @@ begin
     from hh_expenses e
     cross join hm m
   ),
+  -- `currency` sin calificar acá sería ambiguo: esta función es plpgsql y
+  -- `returns table(..., currency text, ...)` convierte `currency` en una
+  -- variable de la función, que choca con la columna real de share_rows/
+  -- hh_repayments si no se la califica con el nombre de la CTE/tabla.
   share_totals as (
-    select member_id, currency, sum(share) as share
+    select share_rows.member_id, share_rows.currency, sum(share_rows.share) as share
     from share_rows
-    group by member_id, currency
+    group by share_rows.member_id, share_rows.currency
   ),
   outgoing_totals as (
-    select from_id as member_id, currency, sum(amount) as outgoing
+    select hh_repayments.from_id as member_id, hh_repayments.currency, sum(hh_repayments.amount) as outgoing
     from hh_repayments
-    group by from_id, currency
+    group by hh_repayments.from_id, hh_repayments.currency
   ),
   incoming_totals as (
-    select to_id as member_id, currency, sum(amount) as incoming
+    select hh_repayments.to_id as member_id, hh_repayments.currency, sum(hh_repayments.amount) as incoming
     from hh_repayments
-    group by to_id, currency
+    group by hh_repayments.to_id, hh_repayments.currency
   )
   select
     m.user_id,
