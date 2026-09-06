@@ -36,6 +36,8 @@ export default function HistorialPage() {
     goals,
     savings,
     repayments,
+    ensureMonthLoaded,
+    loadFullHistory,
   } = useApp()
 
   const [kindFilter, setKindFilter] = useState<ActivityKind | null>(null)
@@ -43,6 +45,16 @@ export default function HistorialPage() {
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
   const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
   const [filtersOpen, setFiltersOpen] = useState(false)
+
+  function handleMonthChange(month: MonthCursor) {
+    void ensureMonthLoaded(month)
+    setMonthFilter(month)
+  }
+
+  async function showFullHistory() {
+    await loadFullHistory()
+    setMonthFilter(null)
+  }
 
   const scopeFilter = useMemo(() => {
     if (isPersonal) return { scope: 'personal' as const, ownerId: currentUser?.id ?? '' }
@@ -135,9 +147,9 @@ export default function HistorialPage() {
       <div className="flex flex-col items-center gap-1.5">
         {monthFilter ? (
           <>
-            <MonthNav value={monthFilter} onChange={setMonthFilter} />
+            <MonthNav value={monthFilter} onChange={handleMonthChange} />
             <button
-              onClick={() => setMonthFilter(null)}
+              onClick={showFullHistory}
               className="text-xs font-medium text-primary"
             >
               Ver todo el historial

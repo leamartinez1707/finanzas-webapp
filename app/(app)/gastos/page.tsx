@@ -45,12 +45,24 @@ export default function GastosPage() {
     addBudget,
     updateBudget,
     deleteBudget,
+    ensureMonthLoaded,
+    loadFullHistory,
   } = useApp()
 
   // --- filters ---
   const [openCategory, setOpenCategory] = useState<CategoryId | null>(null)
   const [openPayer, setOpenPayer] = useState<string | null>(null)
   const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
+
+  function handleMonthChange(month: MonthCursor) {
+    void ensureMonthLoaded(month)
+    setMonthFilter(month)
+  }
+
+  async function showFullHistory() {
+    await loadFullHistory()
+    setMonthFilter(null)
+  }
 
   // --- add / edit sheet ---
   const [editing, setEditing] = useState<Expense | undefined>(undefined)
@@ -416,9 +428,9 @@ export default function GastosPage() {
       <div className="flex flex-col items-center gap-1.5">
         {monthFilter ? (
           <>
-            <MonthNav value={monthFilter} onChange={setMonthFilter} />
+            <MonthNav value={monthFilter} onChange={handleMonthChange} />
             <button
-              onClick={() => setMonthFilter(null)}
+              onClick={showFullHistory}
               className="text-xs font-medium text-primary"
             >
               Ver todo el historial

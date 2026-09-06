@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Download, PieChart } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { computeBalances } from '@/lib/balance'
@@ -36,9 +36,32 @@ export default function ResumenPage() {
     members,
     expenses,
     repayments,
+    householdBalances,
+    ensureMonthLoaded,
+    loadFullHistory,
   } = useApp()
 
   const [monthFilter, setMonthFilter] = useState<MonthCursor | null>(currentMonthCursor())
+
+  function handleMonthChange(month: MonthCursor) {
+    void ensureMonthLoaded(month)
+    setMonthFilter(month)
+  }
+
+  async function showFullHistory() {
+    await loadFullHistory()
+    setMonthFilter(null)
+  }
+
+  // La tendencia de 6 meses (trendMonths, abajo) necesita el mes más viejo
+  // de ese rango cargado en memoria — puede caer antes de la ventana actual
+  // aunque trendEndCursor mismo ya esté cubierto por ensureMonthLoaded.
+  useEffect(() => {
+    let cursor = monthFilter ?? currentMonthCursor()
+    for (let i = 0; i < 5; i++) cursor = prevMonthCursor(cursor)
+    void ensureMonthLoaded(cursor)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthFilter?.year, monthFilter?.month, ensureMonthLoaded])
 
   // --- resolve household members (same as gastos/page.tsx) ---
   const householdMembers = useMemo(() => {
@@ -128,22 +151,33 @@ export default function ResumenPage() {
 
   const byPerson = useMemo(() => {
     if (isPersonal || !activeHousehold || householdMembers.length === 0) return []
-    const { balances } = computeBalances(
-      householdMembers,
-      householdExpenses,
-      householdRepayments,
-      monthFilter ?? undefined,
-    )
+    // Con un mes puntual seleccionado, ese mes siempre está en la ventana
+    // cargada (ensureMonthLoaded más arriba) así que computeBalances sobre
+    // los arrays en memoria sigue sirviendo. "Ver todo el historial"
+    // (monthFilter null) necesita el agregado server-side (all-time),
+    // no los arrays ventaneados.
+    if (monthFilter) {
+      const { balances } = computeBalances(householdMembers, householdExpenses, householdRepayments, monthFilter)
+      return householdMembers
+        .map((m) => {
+          const paid = balances
+            .filter((b) => b.memberId === m.id && b.currency === activeCurrency)
+            .reduce((s, b) => s + b.paid, 0)
+          return { member: m, paid }
+        })
+        .filter((p) => p.paid > 0)
+        .sort((a, b) => b.paid - a.paid)
+    }
     return householdMembers
       .map((m) => {
-        const paid = balances
-          .filter((b) => b.memberId === m.id && b.currency === activeCurrency)
+        const paid = householdBalances
+          .filter((b) => b.householdId === activeHousehold.id && b.memberId === m.id && b.currency === activeCurrency)
           .reduce((s, b) => s + b.paid, 0)
         return { member: m, paid }
       })
       .filter((p) => p.paid > 0)
       .sort((a, b) => b.paid - a.paid)
-  }, [isPersonal, activeHousehold, householdMembers, householdExpenses, householdRepayments, monthFilter, activeCurrency])
+  }, [isPersonal, activeHousehold, householdMembers, householdExpenses, householdRepayments, householdBalances, monthFilter, activeCurrency])
 
   const hasData = filteredExpenses.length > 0
 
@@ -194,9 +228,9 @@ export default function ResumenPage() {
       <div className="flex flex-col items-center gap-1.5">
         {monthFilter ? (
           <>
-            <MonthNav value={monthFilter} onChange={setMonthFilter} />
+            <MonthNav value={monthFilter} onChange={handleMonthChange} />
             <button
-              onClick={() => setMonthFilter(null)}
+              onClick={showFullHistory}
               className="text-xs font-medium text-primary"
             >
               Ver todo el historial

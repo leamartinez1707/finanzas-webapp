@@ -9,13 +9,13 @@ import { MonthNav } from '@/components/month-nav'
 import { PersonAvatar } from '@/components/person-avatar'
 import { RepaymentForm } from '@/components/repayment-form'
 import { Sheet } from '@/components/sheet'
-import { currentMonthCursor, formatRelative, isSameMonthCursor, parseLocalDate } from '@/lib/format'
+import { currentMonthCursor, formatRelative, isSameMonthCursor, monthCursorEndIso, monthCursorLabel, parseLocalDate } from '@/lib/format'
 import { showError, showSuccess } from '@/lib/toast'
 import type { Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function BalanceCard() {
-  const { activeHousehold, members, expenses, repayments, currentUserId, getMember, addRepayment, updateRepayment, deleteRepayment, busy } = useApp()
+  const { activeHousehold, members, expenses, repayments, householdBalances, ensureMonthLoaded, currentUserId, getMember, addRepayment, updateRepayment, deleteRepayment, busy } = useApp()
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Repayment>()
   const currentMonth = currentMonthCursor()
@@ -25,11 +25,12 @@ export function BalanceCard() {
   const householdMembers = activeHousehold.memberIds.map((id) => members.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => Boolean(m))
   const householdExpenses = expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold.id)
   const householdRepayments = repayments.filter((r) => r.householdId === activeHousehold.id)
-  // Sin filtrar por mes a propósito: el balance es una cuenta corriente que se
-  // arrastra hasta saldarse, no algo que "cierra" cada mes — si quedó algo sin
-  // pagar de julio, se tiene que seguir viendo en agosto y en septiembre.
-  // selectedMonth solo se usa más abajo, para navegar el gasto histórico.
-  const { balances, currencies } = computeBalances(householdMembers, householdExpenses, householdRepayments)
+  // Balance de cuenta corriente sobre TODO el historial — se calcula en el
+  // servidor (get_household_balances), no sumando client-side, porque
+  // householdExpenses/householdRepayments arriba están acotados a la
+  // ventana reciente que carga loadData() (ver lib/store.tsx).
+  const balances = householdBalances.filter((b) => b.householdId === activeHousehold.id)
+  const currencies = [...new Set(balances.map((b) => b.currency))]
   const activeBalance = balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)
   const settlements = currencies.flatMap((currency) => computeSettlements(balances, currency))
   const otherCurrencies = currencies.filter((currency) => currency !== activeHousehold.currency)
@@ -42,21 +43,39 @@ export function BalanceCard() {
   const settled = Math.abs(myNet) < 0.01
   const isCurrentMonth = isSameMonthCursor(selectedMonth, currentMonth)
 
-  // Cuánto de ese total es de este mes vs. de antes — mismo cálculo de
-  // arriba, pero excluyendo el mes en curso, para separar "lo que se sumó
-  // ahora" de "lo que venía arrastrado". Nada de esto pega en el server: son
-  // un par de filtros + sumas sobre arrays que ya están en memoria — con un
-  // hogar de pocos gastos por día, ni con años de historial se nota.
-  const isInCurrentMonth = (iso: string) => {
-    const d = parseLocalDate(iso)
-    return d.getFullYear() === currentMonth.year && d.getMonth() === currentMonth.month
-  }
-  const pastNet = computeBalances(
-    householdMembers,
-    householdExpenses.filter((e) => !isInCurrentMonth(e.date)),
-    householdRepayments.filter((r) => !isInCurrentMonth(r.date)),
-  ).balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
+  // Cuánto de ese total es de este mes vs. de antes — el mes actual siempre
+  // está en la ventana cargada, así que computeBalances (client-side, solo
+  // sobre ese mes) sigue sirviendo acá; "de antes" sale de restarle eso al
+  // total ya agregado en el servidor. Esto es específico del mes REAL
+  // actual (no de selectedMonth) — es "cuánto arrastrabas al arrancar este
+  // mes vs. cuánto pasó recién".
+  const currentMonthNet = computeBalances(householdMembers, householdExpenses, householdRepayments, currentMonth)
+    .balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
+  const pastNet = myNet - currentMonthNet
   const showPastBalance = isCurrentMonth && Math.abs(pastNet) >= 0.01
+
+  // Al navegar a un mes VIEJO con las flechas, el número grande de arriba
+  // sigue mostrando tu saldo real de HOY (myNet) — a propósito, es el único
+  // accionable con "Registrar pago". Para no confundir "hoy" con "ese mes",
+  // esta otra línea calcula tu saldo tal cual estaba A FIN de ese mes
+  // puntual: el total de hoy menos todo lo que pasó DESPUÉS de ese mes
+  // (siempre en la ventana cargada, porque ensureMonthLoaded ya garantiza
+  // todo desde selectedMonth hasta hoy). Si selectedMonth es el mes actual
+  // da lo mismo que myNet, así que no hace falta mostrarla dos veces.
+  const netAfterSelectedMonth = isCurrentMonth
+    ? 0
+    : computeBalances(
+        householdMembers,
+        householdExpenses.filter((e) => e.date > monthCursorEndIso(selectedMonth)),
+        householdRepayments.filter((r) => r.date > monthCursorEndIso(selectedMonth)),
+      ).balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
+  const balanceAtSelectedMonthEnd = myNet - netAfterSelectedMonth
+  const showBalanceAtSelectedMonthEnd = !isCurrentMonth && Math.abs(balanceAtSelectedMonthEnd) >= 0.01
+
+  function handleMonthChange(month: typeof selectedMonth) {
+    void ensureMonthLoaded(month)
+    setSelectedMonth(month)
+  }
 
   async function save(data: Omit<Repayment, 'id' | 'createdById'>) {
     try { await addRepayment(data); showSuccess('Pago registrado.'); setAdding(false) } catch (error) { showError(error) }
@@ -87,6 +106,16 @@ export function BalanceCard() {
             amount={Math.abs(pastNet)}
             currency={activeHousehold.currency}
             className={cn('font-semibold', pastNet > 0 ? 'text-positive' : 'text-destructive')}
+          />
+        </p>
+      )}
+      {showBalanceAtSelectedMonthEnd && (
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Saldo a fin de {monthCursorLabel(selectedMonth)}: {balanceAtSelectedMonthEnd > 0 ? 'te debían' : 'debías'}{' '}
+          <Money
+            amount={Math.abs(balanceAtSelectedMonthEnd)}
+            currency={activeHousehold.currency}
+            className={cn('font-semibold', balanceAtSelectedMonthEnd > 0 ? 'text-positive' : 'text-destructive')}
           />
         </p>
       )}
@@ -121,7 +150,7 @@ export function BalanceCard() {
       )}
       {otherCurrencies.length > 0 && <div className="mt-3 space-y-1 text-xs text-muted-foreground"><p>También hay saldos separados:</p>{otherCurrencies.map((currency) => { const balance = balances.find((b) => b.memberId === currentUserId && b.currency === currency); return <p key={currency}><span className="font-semibold text-foreground">{currency}</span>: <Money amount={balance?.net ?? 0} currency={currency} sign className={(balance?.net ?? 0) >= 0 ? 'text-positive' : 'text-destructive'} /></p> })}</div>}
       <div className="mt-5 border-t border-border pt-4">
-        <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
+        <MonthNav value={selectedMonth} onChange={handleMonthChange} />
         <p className="mt-2 text-center text-xs text-muted-foreground">
           Gasto compartido {isCurrentMonth ? 'este mes' : 'del mes'} en {activeHousehold.currency}:{' '}
           <Money amount={activeExpensesTotal} currency={activeHousehold.currency} className="text-xs font-semibold text-foreground" />

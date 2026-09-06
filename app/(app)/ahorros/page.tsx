@@ -23,6 +23,8 @@ export default function AhorrosPage() {
     loading,
     members,
     savings,
+    personalSavingsTotals,
+    householdSavingsTotals,
     busy,
     addSavings,
     updateSavings,
@@ -55,13 +57,13 @@ export default function AhorrosPage() {
   }, [isPersonal, activeHousehold, currentUser, members])
 
   // Available balance in Ingresos, for the "current user, personal" case only —
-  // just a hint shown while transferring, not a hard limit.
+  // just a hint shown while transferring, not a hard limit. Server-side
+  // sobre todo el historial (get_personal_savings_totals) — `savings` está
+  // acotado a la ventana reciente que carga loadData().
   const availableInIngresos = useMemo(() => {
     if (!isPersonal || !currentUser) return null
-    return savings
-      .filter((s) => s.bucket === 'ingresos' && s.scope === 'personal' && s.memberId === currentUser.id)
-      .reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
-  }, [savings, isPersonal, currentUser])
+    return personalSavingsTotals.find((t) => t.bucket === 'ingresos')?.balance ?? 0
+  }, [personalSavingsTotals, isPersonal, currentUser])
 
   // Savings movements per member, scoped to current context
   const savingsByMember = useMemo(() => {
@@ -88,9 +90,22 @@ export default function AhorrosPage() {
     movs.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }
 
+  // Total "ahorrado" por miembro, sobre TODO el historial — server-side
+  // (get_household_savings_totals / get_personal_savings_totals), no
+  // sumando `movs` (que es solo la ventana reciente, para la lista de
+  // abajo). Household + personal-propio, mismo criterio que ya aplicaba
+  // acá el filtro de savingsByMember (RLS solo deja ver el personal de
+  // uno mismo, nunca el de otro miembro).
   function memberBalance(memberId: string) {
-    const movs = savingsByMember.get(memberId) ?? []
-    return movs.reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
+    const householdTotal = !isPersonal && activeHousehold
+      ? householdSavingsTotals.find(
+          (t) => t.householdId === activeHousehold.id && t.memberId === memberId && t.bucket === 'ahorro',
+        )?.balance ?? 0
+      : 0
+    const personalTotal = memberId === currentUser?.id
+      ? personalSavingsTotals.find((t) => t.bucket === 'ahorro')?.balance ?? 0
+      : 0
+    return householdTotal + personalTotal
   }
 
   async function handleAdd(e: React.FormEvent) {

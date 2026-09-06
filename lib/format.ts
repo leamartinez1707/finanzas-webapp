@@ -158,6 +158,15 @@ export function monthCursorKey(m: MonthCursor) {
   return `${m.year}-${String(m.month + 1).padStart(2, '0')}`
 }
 
+// Último día de ese mes, como "YYYY-MM-DD" — día 0 del mes siguiente es un
+// atajo estándar de JS para "el día anterior al 1º", sin líos de huso
+// horario porque construye la fecha con componentes locales (como
+// parseLocalDate), no parseando un string.
+export function monthCursorEndIso(m: MonthCursor): string {
+  const d = new Date(m.year, m.month + 1, 0)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function monthCursorLabel(m: MonthCursor) {
   const label = MONTHS[m.month]
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} ${m.year}`

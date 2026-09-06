@@ -23,6 +23,8 @@ export default function IngresosPage() {
     loading,
     members,
     savings,
+    personalSavingsTotals,
+    householdSavingsTotals,
     busy,
     addSavings,
     updateSavings,
@@ -72,9 +74,18 @@ export default function IngresosPage() {
     movs.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }
 
+  // Total de Ingresos por miembro, sobre TODO el historial — server-side
+  // (mismo criterio que en ahorros/page.tsx: household + personal-propio).
   function memberBalance(memberId: string) {
-    const movs = savingsByMember.get(memberId) ?? []
-    return movs.reduce((sum, s) => sum + (s.type === 'deposito' ? s.amount : -s.amount), 0)
+    const householdTotal = !isPersonal && activeHousehold
+      ? householdSavingsTotals.find(
+          (t) => t.householdId === activeHousehold.id && t.memberId === memberId && t.bucket === 'ingresos',
+        )?.balance ?? 0
+      : 0
+    const personalTotal = memberId === currentUser?.id
+      ? personalSavingsTotals.find((t) => t.bucket === 'ingresos')?.balance ?? 0
+      : 0
+    return householdTotal + personalTotal
   }
 
   async function handleAdd(e: React.FormEvent) {
