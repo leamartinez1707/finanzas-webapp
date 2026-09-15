@@ -637,7 +637,7 @@ export default function GastosPage() {
                         }))
                       }
                       placeholder="Sin tope"
-                      className="w-28 rounded-xl border border-border bg-card px-3 py-2 text-right text-sm tnum outline-none transition-shadow placeholder:text-muted-foreground/60 focus:border-ring focus:ring-4 focus:ring-ring/15"
+                      className="w-28 rounded-xl border border-border bg-card px-3 py-2 text-right text-base tnum outline-none transition-shadow placeholder:text-muted-foreground/60 focus:border-ring focus:ring-4 focus:ring-ring/15"
                     />
                   </div>
                   {hasAmount && (
