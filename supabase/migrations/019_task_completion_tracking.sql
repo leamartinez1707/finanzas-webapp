@@ -13,17 +13,37 @@
 -- kept in lockstep with it via the check constraints below, so
 -- there's no way for "completed = true" and "completed_at is null" to
 -- drift apart.
+--
+-- Written idempotent (if not exists / if exists everywhere) so it's
+-- safe to re-run after a partial failure, which is exactly what
+-- happened the first time: any task completed BEFORE this migration
+-- has completed = true with the new columns defaulting to null, which
+-- violates the check constraints below unless backfilled first.
 -- ============================================================
 
 alter table public.tasks
-  add column completed_by_id uuid references auth.users(id) on delete set null,
-  add column completed_at timestamptz;
+  add column if not exists completed_by_id uuid references auth.users(id) on delete set null,
+  add column if not exists completed_at timestamptz;
+
+-- Backfill tasks completed before this migration existed — there's no
+-- real "who/when" for them, so approximate: assignee_id is the most
+-- likely person who actually did it, and created_at is the closest
+-- timestamp on hand. Only touches rows the constraints below would
+-- otherwise reject.
+update public.tasks
+set completed_by_id = coalesce(completed_by_id, assignee_id),
+    completed_at = coalesce(completed_at, created_at, now())
+where completed = true and (completed_by_id is null or completed_at is null);
+
+alter table public.tasks
+  drop constraint if exists tasks_completed_by_id_consistency,
+  drop constraint if exists tasks_completed_at_consistency;
 
 alter table public.tasks
   add constraint tasks_completed_by_id_consistency check ((completed = false) = (completed_by_id is null)),
   add constraint tasks_completed_at_consistency check ((completed = false) = (completed_at is null));
 
-create index idx_tasks_completed_at on public.tasks(completed_at desc);
+create index if not exists idx_tasks_completed_at on public.tasks(completed_at desc);
 
 -- ─── RLS: pin completed_by_id to the caller ──────────────────────────
 -- Same policy as 015_tareas.sql's "tasks_update", plus one more `with
