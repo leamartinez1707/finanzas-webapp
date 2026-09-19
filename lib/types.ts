@@ -97,6 +97,8 @@ export interface Task {
   dueDate: string // ISO date, requerido
   dueTime?: string // 'HH:MM', opcional
   completed: boolean
+  completedById?: string // quién tocó el check — se limpia junto con `completed`
+  completedAt?: string // timestamp ISO de cuándo se completó — se limpia junto con `completed`
   createdById: string
   createdAt?: string // when the row was actually inserted (has a real time) — distinct from `dueDate`, which never does
 }

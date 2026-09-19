@@ -54,11 +54,15 @@ export function monthLabel(key: string) {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}${year}`
 }
 
-// "Hoy" en fecha local (YYYY-MM-DD) — NUNCA toISOString(), que da la fecha en UTC
-// y se corre respecto al día local apenas se cruzan las ~21hs en Uruguay (UTC-3).
-export function todayLocalISO(): string {
-  const d = new Date()
+// Fecha local (YYYY-MM-DD) de un Date dado — NUNCA toISOString(), que da la
+// fecha en UTC y se corre respecto al día local apenas se cruzan las ~21hs
+// en Uruguay (UTC-3).
+export function toLocalDateOnly(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function todayLocalISO(): string {
+  return toLocalDateOnly(new Date())
 }
 
 // Parsea un "YYYY-MM-DD" (columna `date` de Postgres, sin hora) como fecha LOCAL.

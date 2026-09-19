@@ -14,6 +14,38 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'historial-de-tareas',
+    title: 'Tareas: ahora con historial de completadas',
+    excerpt:
+      'Una tarea completada con fecha vencida ya no desaparece sin dejar rastro: sumamos un historial para ver qué se hizo, quién lo hizo y cuándo.',
+    date: '2026-09-19',
+    content: (
+      <>
+        <p key="p1">
+          Hasta ahora, una vez que se pasaba su fecha límite, una tarea
+          completada dejaba de verse en cualquier lado — no estaba en{' '}
+          <strong>Atrasadas</strong> (porque ya estaba hecha), ni en{' '}
+          <strong>Hoy</strong> o <strong>Futuras</strong> (porque su fecha ya
+          había pasado). Quedaba guardada, pero invisible: no había forma de
+          repasar qué se hizo ni quién lo hizo.
+        </p>
+        <p key="p2">
+          Agregamos un <strong>historial</strong> al final de Tareas, con un
+          desplegable para ver las <strong>completadas del mes</strong> o todo
+          el historial completo. Se puede ordenar de más recientes a más
+          antiguas (o al revés) y, en un hogar con más de una persona,
+          filtrar por quién la completó — así queda claro quién hizo qué la
+          última vez, sin tener que acordarse de memoria.
+        </p>
+        <p key="p3" className="text-sm text-muted-foreground">
+          Cada tarea completada ahora guarda quién tocó el check y en qué
+          momento exacto, no solo si está hecha o no — es lo que hace posible
+          el orden cronológico del historial.
+        </p>
+      </>
+    ),
+  },
+  {
     slug: 'disponible-incluye-hogares',
     title: 'Disponible y Gasto del mes ahora incluyen tu parte en los hogares',
     excerpt:

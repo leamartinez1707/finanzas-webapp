@@ -64,6 +64,8 @@ function toTask(row: any): Task {
     dueDate: row.fecha_limite,
     dueTime: row.hora_limite ? row.hora_limite.slice(0, 5) : undefined,
     completed: row.completed,
+    completedById: row.completed_by_id ?? undefined,
+    completedAt: row.completed_at ?? undefined,
     createdById: row.created_by,
     createdAt: row.created_at ?? undefined,
   }
@@ -700,6 +702,12 @@ export async function updateTask(id: string, patch: Partial<Task>) {
   if (patch.dueDate !== undefined) update.fecha_limite = patch.dueDate
   if (patch.dueTime !== undefined) update.hora_limite = patch.dueTime || null
   if (patch.completed !== undefined) update.completed = patch.completed
+  // Checks key presence, not `!== undefined` — reabrir una tarea completada
+  // necesita poder limpiar estos dos campos a null explícitamente (ver
+  // toggle() en app/(app)/tareas/page.tsx), y un valor `undefined` es la
+  // forma en que el caller señala eso.
+  if ('completedById' in patch) update.completed_by_id = patch.completedById ?? null
+  if ('completedAt' in patch) update.completed_at = patch.completedAt ?? null
 
   const { error } = await s.from('tasks').update(update).eq('id', id)
   if (error) throw error
