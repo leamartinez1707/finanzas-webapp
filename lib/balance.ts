@@ -55,13 +55,33 @@ export function computeBalances(
 // expense itself (manual override → frozen household-split snapshot → even
 // 1/N fallback) — never at the household's current default_split, since
 // that config only applies to expenses created after it was set.
+//
+// El que pagó absorbe el resto del redondeo, para que las partes sumen
+// EXACTO el monto del gasto. Antes se redondeaba la parte de cada uno por
+// separado: con 2 personas y un monto impar los dos redondeaban para arriba
+// ($4.567 → $2.284 cada uno = $4.568), así que la suma de los netos de todo
+// el hogar dejaba de dar 0 y cada miembro veía un total de deuda distinto al
+// del otro (la diferencia crecía $1 por cada gasto de monto impar).
+// Cualquier cambio acá va replicado en private.expense_share (ver
+// supabase/migrations/020_balance_future_dates_and_rounding.sql).
 export function expenseShare(expense: Expense, memberId: string, memberCount: number): number {
+  // Override manual: addExpense() ya valida que las partes sumen el monto.
   if (expense.shares) return expense.shares.find((s) => s.memberId === memberId)?.amount ?? 0
+
   if (expense.splitSnapshot) {
+    if (memberId === expense.payerId) {
+      const othersTotal = expense.splitSnapshot
+        .filter((s) => s.memberId !== expense.payerId)
+        .reduce((sum, s) => sum + Math.round((expense.amount * s.percent) / 100), 0)
+      return expense.amount - othersTotal
+    }
     const pct = expense.splitSnapshot.find((s) => s.memberId === memberId)?.percent ?? 0
     return Math.round((expense.amount * pct) / 100)
   }
-  return memberCount > 1 ? Math.round(expense.amount / memberCount) : expense.amount
+
+  if (memberCount <= 1) return expense.amount
+  const base = Math.round(expense.amount / memberCount)
+  return memberId === expense.payerId ? expense.amount - base * (memberCount - 1) : base
 }
 
 // Nota: qué gastos siguen sin saldar entre dos miembros (antes calculado

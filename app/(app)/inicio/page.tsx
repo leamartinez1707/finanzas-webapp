@@ -6,7 +6,7 @@ import { ArrowRight, Plus, Receipt, Sparkles, Check, LogOut, Bell, Loader2 } fro
 import { useApp } from '@/lib/store'
 import { buildActivity } from '@/lib/activity'
 import { computeRealSpend, expenseShare } from '@/lib/balance'
-import { isThisMonth } from '@/lib/format'
+import { isThisMonth, todayLocalISO } from '@/lib/format'
 import { BalanceCard } from '@/components/balance-card'
 import { ActivityRow } from '@/components/activity-row'
 import { GoalCard, goalSaved } from '@/components/goal-card'
@@ -121,7 +121,15 @@ export default function InicioPage() {
   // conversión de moneda en la app). Client-side sobre `expenses`: el mes
   // en curso siempre está en la ventana reciente que carga loadData(), así
   // que no hace falta un RPC para este desglose puntual.
-  const monthSpend = currentUser ? computeRealSpend(expenses, myHouseholds, currentUser.id, isThisMonth) : undefined
+  //
+  // Se excluyen los gastos con fecha futura (alguien puede cargar hoy algo
+  // fechado la semana que viene): todavía no salió esa plata, y "Disponible"
+  // acá al lado tampoco los cuenta — get_personal_expense_totals y
+  // get_my_household_expense_share_totals cortan en la fecha de hoy.
+  const todayIso = todayLocalISO()
+  const monthSpend = currentUser
+    ? computeRealSpend(expenses, myHouseholds, currentUser.id, (date) => isThisMonth(date) && date <= todayIso)
+    : undefined
 
   const personalMonth = monthSpend?.totalByCurrency[activeCurrency] ?? 0
 

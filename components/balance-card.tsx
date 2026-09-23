@@ -9,7 +9,7 @@ import { MonthNav } from '@/components/month-nav'
 import { PersonAvatar } from '@/components/person-avatar'
 import { RepaymentForm } from '@/components/repayment-form'
 import { Sheet } from '@/components/sheet'
-import { currentMonthCursor, formatRelative, isSameMonthCursor, monthCursorEndIso, monthCursorLabel, parseLocalDate } from '@/lib/format'
+import { currentMonthCursor, formatRelative, isSameMonthCursor, monthCursorEndIso, monthCursorLabel, parseLocalDate, todayLocalISO } from '@/lib/format'
 import { showError, showSuccess } from '@/lib/toast'
 import type { Repayment } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -25,6 +25,15 @@ export function BalanceCard() {
   const householdMembers = activeHousehold.memberIds.map((id) => members.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => Boolean(m))
   const householdExpenses = expenses.filter((e) => e.scope === 'household' && e.householdId === activeHousehold.id)
   const householdRepayments = repayments.filter((r) => r.householdId === activeHousehold.id)
+  // Un gasto (o pago) con fecha futura todavía no pasó, así que no genera
+  // deuda hoy: get_household_balances lo excluye del total del servidor y
+  // recién lo cuenta cuando llega su fecha. Los cálculos client-side de más
+  // abajo se RESTAN de ese total, así que tienen que aplicar el mismo corte
+  // o el resultado queda descuadrado. Las fechas son 'YYYY-MM-DD', así que
+  // comparar como string alcanza (mismo criterio que monthCursorEndIso).
+  const today = todayLocalISO()
+  const settledExpenses = householdExpenses.filter((e) => e.date <= today)
+  const settledRepayments = householdRepayments.filter((r) => r.date <= today)
   // Balance de cuenta corriente sobre TODO el historial — se calcula en el
   // servidor (get_household_balances), no sumando client-side, porque
   // householdExpenses/householdRepayments arriba están acotados a la
@@ -49,7 +58,7 @@ export function BalanceCard() {
   // total ya agregado en el servidor. Esto es específico del mes REAL
   // actual (no de selectedMonth) — es "cuánto arrastrabas al arrancar este
   // mes vs. cuánto pasó recién".
-  const currentMonthNet = computeBalances(householdMembers, householdExpenses, householdRepayments, currentMonth)
+  const currentMonthNet = computeBalances(householdMembers, settledExpenses, settledRepayments, currentMonth)
     .balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
   const pastNet = myNet - currentMonthNet
   const showPastBalance = isCurrentMonth && Math.abs(pastNet) >= 0.01
@@ -66,8 +75,8 @@ export function BalanceCard() {
     ? 0
     : computeBalances(
         householdMembers,
-        householdExpenses.filter((e) => e.date > monthCursorEndIso(selectedMonth)),
-        householdRepayments.filter((r) => r.date > monthCursorEndIso(selectedMonth)),
+        settledExpenses.filter((e) => e.date > monthCursorEndIso(selectedMonth)),
+        settledRepayments.filter((r) => r.date > monthCursorEndIso(selectedMonth)),
       ).balances.find((b) => b.memberId === currentUserId && b.currency === activeHousehold.currency)?.net ?? 0
   const balanceAtSelectedMonthEnd = myNet - netAfterSelectedMonth
   const showBalanceAtSelectedMonthEnd = !isCurrentMonth && Math.abs(balanceAtSelectedMonthEnd) >= 0.01
